@@ -185,8 +185,6 @@ context_menu:
   start_radio: Start radio
   copy_uri: URI('s) kopiëren
   refresh: Verversen
-dropzones:
-  dragging_things: 'Versleep %{count} dingen'
 playback_controls:
   consume: Consumeren
   shuffle: Willekeurig
@@ -354,7 +352,7 @@ settings:
       label: Thema
       auto: Auto
       auto_tooltip: Detecteert jouw keuze in de browser of besturingssysteem
-      dark: Donkder
+      dark: Donker
       light: Licht
     behavior:
       label: Gedrag
@@ -366,9 +364,6 @@ settings:
       touch_events_tooltip: Maakt het mogelijk om naar links of rechts te vegen om van tracks te veranderen
       grid_glow: Miniatuur gloei effect
       wide_scrollbars: Gebruik brede schuifbalken
-    sources_priority:
-      label: Prioriteit bronnen
-      description: Verslepen om voorrang van zoekmachines en resultaten te wijzigen
     reporting:
       label: Rapportering
       sublabel: Sta het versturen van anonieme gebruiksstatistieken toe

@@ -100,11 +100,10 @@ export function startSearch(query) {
   };
 }
 
-export function searchResultsLoaded(query, resultType, results) {
+export function searchResultsLoaded(key, results) {
   return {
     type: 'SEARCH_RESULTS_LOADED',
-    query,
-    resultType,
+    key,
     results,
   };
 }
@@ -138,8 +137,8 @@ export function loadItems(itemType, uris = [], options = {}) {
   };
 }
 
-export function loadItem(uri, options = {}) {
-  return loadItems([uri], options);
+export function loadItem(itemType, uri, options = {}) {
+  return loadItems(itemType, [uri], options);
 }
 
 export function loadTrack(uri, options = {}) {
@@ -169,6 +168,14 @@ export function loadArtist(uri, options = {}) {
 export function loadPlaylist(uri, options = {}) {
   return {
     type: 'LOAD_PLAYLIST',
+    uri,
+    options,
+  };
+}
+
+export function loadPlaylistGroup(uri, options = {}) {
+  return {
+    type: 'LOAD_PLAYLIST_GROUP',
     uri,
     options,
   };
@@ -212,6 +219,14 @@ export function removeFromLibrary(uri, itemUri) {
     type: 'REMOVE_FROM_LIBRARY',
     uri,
     itemUri,
+  };
+}
+
+export function setLoading(uri, loading) {
+  return {
+    type: 'SET_LOADING',
+    uri,
+    loading,
   };
 }
 
@@ -355,9 +370,7 @@ export function reorderPlaylistTracks(uri, indexes, insert_before, snapshot_id =
         insert_before,
         snapshot_id,
       };
-
-    case 'm3u':
-    case 'gmusic':
+    default:
       return {
         type: 'MOPIDY_REORDER_PLAYLIST_TRACKS',
         key: uri,
@@ -365,40 +378,22 @@ export function reorderPlaylistTracks(uri, indexes, insert_before, snapshot_id =
         range_length: range.length,
         insert_before,
       };
-
-    default:
-      return {
-        type: 'UNSUPPORTED_ACTION',
-        name: 'reorderPlaylistTracks',
-      };
   }
 }
 
-export function savePlaylist(uri, name, description = '', is_public = false, is_collaborative = false, image = null) {
+export function savePlaylist(uri, data) {
   switch (uriSource(uri)) {
     case 'spotify':
       return {
         type: 'SPOTIFY_SAVE_PLAYLIST',
         key: uri,
-        name,
-        description: (description == '' ? null : description),
-        image,
-        is_public,
-        is_collaborative,
+        data,
       };
-
-    case 'm3u':
-    case 'gmusic':
+    default:
       return {
         type: 'MOPIDY_SAVE_PLAYLIST',
         key: uri,
-        name,
-      };
-
-    default:
-      return {
-        type: 'UNSUPPORTED_ACTION',
-        name: 'savePlaylist',
+        data,
       };
   }
 }
@@ -416,7 +411,6 @@ export function deletePlaylist(uri) {
   switch (uriSource(uri)) {
     case 'spotify':
       return spotifyActions.following(uri, 'DELETE');
-
     default:
       return mopidyActions.deletePlaylist(uri);
   }
@@ -430,19 +424,11 @@ export function removeTracksFromPlaylist(uri, tracks_indexes) {
         key: uri,
         tracks_indexes,
       };
-
-    case 'm3u':
-    case 'gmusic':
+    default:
       return {
         type: 'MOPIDY_REMOVE_PLAYLIST_TRACKS',
         key: uri,
         tracks_indexes,
-      };
-
-    default:
-      return {
-        type: 'UNSUPPORTED_ACTION',
-        name: 'removeTracksFromPlaylist',
       };
   }
 }
@@ -455,19 +441,11 @@ export function addTracksToPlaylist(uri, tracks_uris) {
         key: uri,
         tracks_uris,
       };
-
-    case 'm3u':
-    case 'gmusic':
+    default:
       return {
         type: 'MOPIDY_ADD_PLAYLIST_TRACKS',
         key: uri,
         tracks_uris,
-      };
-
-    default:
-      return {
-        type: 'UNSUPPORTED_ACTION',
-        name: 'addTracksToPlaylist',
       };
   }
 }

@@ -21,7 +21,8 @@ import {
   makeItemSelector,
   makeLoadingSelector,
 } from '../util/selectors';
-import ContextMenuTrigger from '../components/ContextMenuTrigger';
+import ContextMenuTrigger from '../components/ContextMenu/ContextMenuTrigger';
+import { withRouter } from '../util';
 
 class User extends React.Component {
   componentDidMount() {
@@ -58,13 +59,12 @@ class User extends React.Component {
   }
 
   handleContextMenu = (e) => {
-    const { user, uri, uiActions: { showContextMenu } } = this.props;
+    const { user, uiActions: { showContextMenu } } = this.props;
 
     showContextMenu({
       e,
-      context: 'user',
-      items: [user],
-      uris: [uri],
+      item: user,
+      type: 'user',
     });
   }
 
@@ -198,7 +198,7 @@ class User extends React.Component {
 }
 
 const mapStateToProps = (state, ownProps) => {
-  const uri = decodeUri(ownProps.match.params.uri);
+  const uri = decodeUri(ownProps.params.uri);
   const loadingSelector = makeLoadingSelector([`(.*)${uri}(.*)`]);
   const userSelector = makeItemSelector(uri);
   const user = userSelector(state);
@@ -223,4 +223,4 @@ const mapDispatchToProps = (dispatch) => ({
   spotifyActions: bindActionCreators(spotifyActions, dispatch),
 });
 
-export default connect(mapStateToProps, mapDispatchToProps)(User);
+export default withRouter(connect(mapStateToProps, mapDispatchToProps)(User));

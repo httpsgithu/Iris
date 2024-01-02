@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useDrag } from 'react-dnd';
 import Link from './Link';
 import { SourceIcon } from './Icon';
 import Thumbnail from './Thumbnail';
 import LinksSentence from './LinksSentence';
 import { I18n } from '../locale';
 import { encodeUri } from '../util/format';
+import { isTouchDevice } from '../util/helpers';
 
 import * as uiActions from '../services/ui/actions';
 import * as mopidyActions from '../services/mopidy/actions';
@@ -29,6 +31,10 @@ const SecondaryLine = ({
 
   const items = () => {
     switch (type) {
+      case 'mood':
+      case 'directory':
+      case 'playlist_group':
+        return null;
       case 'playlist':
         return <li><I18n path="specs.tracks" count={trackCount} /></li>;
       case 'artist':
@@ -69,29 +75,33 @@ const GridItem = ({
   const dispatch = useDispatch();
   const grid_glow_enabled = useSelector((state) => state.ui.grid_glow_enabled);
   const spotify_available = useSelector((state) => state.spotify.access_token);
+  const [_, drag] = useDrag({
+    type: item?.type?.toUpperCase() || 'UNKNOWN',
+    item: { item, context: item },
+  });
+  const tile = ['playlist_group', 'mood', 'category'].indexOf(item?.type) > -1
 
   const onContextMenu = (e) => {
     e.preventDefault();
     dispatch(
       uiActions.showContextMenu({
         e,
-        context: item.type,
-        uris: [item.uri],
-        items: [item],
-        tracklist_uri: item.uri, // not needed?
+        type: item.type,
+        item,
       }),
     );
   };
 
   // Load images
   useEffect(() => {
-    if (!item.images) {
+    if (!item.images && !item.loading) {
       switch (item.type) {
         case 'artist':
           if (spotify_available) {
             dispatch(spotifyActions.getArtistImages(item));
           }
           break;
+        case 'playlist':
         case 'album':
           dispatch(mopidyActions.getImages([item.uri]));
           break;
@@ -112,30 +122,38 @@ const GridItem = ({
     to = `/${item.type}/${encodeUri(item.uri)}`;
     if (item.name && item.type !== 'artist') {
       // Strip out "%"; this causes conflicts with our uri decoder
-      to += `/${encodeURIComponent(item.name.replace('%', ''))}`;
+      to += `/${encodeURIComponent(item.name.replace('%', '').replace('/', ''))}`;
     }
   }
 
   return (
-    <Link
-      to={to}
-      onContextMenu={onContextMenu}
-      className={`grid__item grid__item--${itemProp.type}`}
+    <div
+      ref={isTouchDevice() ? undefined : drag}
+      className={`grid__item grid__item--${itemProp.type} ${tile ? 'grid__item--tile' : ''}`}
     >
-      <Thumbnail
-        glow={grid_glow_enabled}
-        size="medium"
-        className="grid__item__thumbnail"
-        images={item.images || item.icons}
-        type={item.type}
-      />
-      <div className="grid__item__name">
-        {item.name ? item.name : <span className="opaque-text">{item.uri}</span>}
-      </div>
-      <div className="grid__item__secondary">
-        <SecondaryLine item={item} sourceIcon={sourceIcon} />
-      </div>
-    </Link>
+      <Link
+        to={to}
+        onContextMenu={onContextMenu}
+      >
+        <Thumbnail
+          glow={grid_glow_enabled}
+          size="medium"
+          className="grid__item__thumbnail"
+          images={item.images || item.icons}
+          type={item.type}
+          loading={item.loading}
+        />
+        <div className="grid__item__name">
+          {item.name
+            ? <span title={item.name}>{item.name}</span>
+            : <span className="opaque-text">{item.uri}</span>
+          }
+        </div>
+        <div className="grid__item__secondary">
+          <SecondaryLine item={item} sourceIcon={sourceIcon} />
+        </div>
+      </Link>
+    </div>
   );
 };
 

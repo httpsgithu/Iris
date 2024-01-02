@@ -1,14 +1,16 @@
 import React from 'react';
+import { uniq } from 'lodash';
 import { arrayOf } from '../../util/arrays';
 import {
   generateGuid,
   getFromUri,
   uriType,
   upgradeSpotifyPlaylistUris,
+  getSearchResultKey,
 } from '../../util/helpers';
 import {
-  formatCategory,
-  formatCategories,
+  formatPlaylistGroup,
+  formatPlaylistGroups,
   formatTracks,
   formatPlaylist,
   formatPlaylists,
@@ -19,7 +21,9 @@ import {
   formatAlbums,
   formatImages,
   formatTrack,
+  formatSimpleObject,
   injectSortId,
+  formatContext,
 } from '../../util/format';
 import URILink from '../../components/URILink';
 import { i18n } from '../../locale';
@@ -360,9 +364,10 @@ export function getTrack(uri, { forceRefetch, full, lyrics }) {
   };
 }
 
-export function getFeaturedPlaylists(forceRefetch = false) {
+export function getLibraryFeaturedPlaylists(forceRefetch = false) {
   return (dispatch, getState) => {
-    dispatch({ type: 'SPOTIFY_FEATURED_PLAYLISTS_LOADED', data: false });
+    const processKey = 'SPOTIFY_GET_LIBRARY_FEATURED_PLAYLISTS';
+    dispatch({ type: processKey, data: false });
 
     const date = new Date();
     date.setHours(date.getHours());
@@ -400,9 +405,13 @@ export function getFeaturedPlaylists(forceRefetch = false) {
         );
 
         dispatch(coreActions.itemsLoaded(playlists));
-
+        dispatch(coreActions.libraryLoaded({
+          uri: 'spotify:featured',
+          type: 'featured_playlists',
+          items_uris: arrayOf('uri', playlists),
+        }));
         dispatch({
-          type: 'SPOTIFY_FEATURED_PLAYLISTS_LOADED',
+          type: processKey,
           data: {
             message: response.message,
             uris: upgradeSpotifyPlaylistUris(arrayOf('uri', playlists)),
@@ -419,68 +428,69 @@ export function getFeaturedPlaylists(forceRefetch = false) {
   };
 }
 
-export function getCategories() {
+export function getLibraryMoods(forceRefetch) {
   return (dispatch, getState) => {
-    const loaderId = generateGuid();
-    dispatch(uiActions.startLoading(loaderId, 'spotify_categories'));
+    const {
+      spotify: {
+        country,
+        locale,
+      } = {},
+    } = getState();
+    const processKey = 'SPOTIFY_GET_LIBRARY_MOODS';
+    dispatch(uiActions.startProcess(processKey, { notification: false }));
 
-    let endpoint = 'browse/categories';
-    endpoint += '?limit=50';
-    endpoint += `&country=${getState().spotify.country}`;
-    endpoint += `&locale=${getState().spotify.locale}`;
+    let libraryItems = [];
+    const fetch = (endpoint) => request({ dispatch, getState, endpoint })
+      .then((response) => {
+        const processor = getState().ui.processes[processKey];
+        if (processor && processor.status === 'cancelling') {
+          dispatch(uiActions.stopLoading('spotify:library:moods'));
+          dispatch(uiActions.processCancelled(processKey));
+          return;
+        }
 
-    request({ dispatch, getState, endpoint })
-      .then(
-        (response) => {
-          let results = formatCategories(response.categories.items);
+        dispatch(uiActions.updateProcess(
+          processKey,
+          { total: response.total, remaining: response.total - libraryItems.length },
+        ));
 
-          const fetchResults = (resultsEndpoint) => request({
-            dispatch,
-            getState,
-            endpoint: resultsEndpoint,
-          }).then((response) => {
-            results = [
-              ...results,
-              ...formatCategories(response.categories.items),
-            ];
-            if (response.categories.next) {
-              fetchResults(response.categories.next);
-            } else {
-              dispatch({
-                type: 'SPOTIFY_CATEGORIES_LOADED',
-                categories: results,
-              });
-              dispatch(uiActions.stopLoading(loaderId));
-            }
-          });
-          fetchResults(endpoint);
-        },
-        (error) => {
-          dispatch(uiActions.stopLoading(loaderId));
-          dispatch(coreActions.handleException(
-            'Could not load categories',
-            error,
-          ));
-        },
-      );
+        const items = formatPlaylistGroups(response.categories.items);
+        libraryItems = [...libraryItems, ...items];
+        if (response.next) {
+          fetch(`${response.next}${forceRefetch ? `&refetch=${Date.now()}` : ''}`);
+        } else {
+          dispatch(uiActions.processFinished(processKey));
+          dispatch(coreActions.itemsLoaded(libraryItems));
+          dispatch(coreActions.libraryLoaded({
+            uri: 'spotify:categories',
+            type: 'moods',
+            items_uris: arrayOf('uri', libraryItems),
+          }));
+        }
+      });
+
+    let endpoint = `browse/categories?limit=50&country=${country}&locale=${locale}`;
+    if (forceRefetch) endpoint += `&refetch=${Date.now()}`;
+    fetch(endpoint);
   };
 }
 
-export function getCategory(uri, { forceRefetch } = {}) {
+export function getMood(uri, { forceRefetch } = {}) {
   return (dispatch, getState) => {
+    const {
+      spotify: {
+        country,
+        locale,
+      } = {},
+    } = getState();
     const loaderId = generateGuid();
-    dispatch(uiActions.startLoading(loaderId, `spotify_category_${uri}`));
+    dispatch(uiActions.startLoading(loaderId, `spotify_mood_${uri}`));
 
     const id = getFromUri('categoryid', uri);
-    let endpoint = `browse/categories/${id}`;
-    endpoint += `?country=${getState().spotify.country}`;
-    endpoint += `&locale=${getState().spotify.locale}`;
+    let endpoint = `browse/categories/${id}?country=${country}&locale=${locale}`;
     if (forceRefetch) endpoint += `&refetch=${Date.now()}`;
 
-    let plEndpoint = `browse/categories/${id}/playlists`;
-    plEndpoint += '?limit=50';
-    plEndpoint += `&country=${getState().spotify.country}`;
-    plEndpoint += `&locale=${getState().spotify.locale}`;
+    let plEndpoint = `browse/categories/${id}/playlists?limit=50&country=${country}&locale=${locale}`;
     if (forceRefetch) plEndpoint += `&refetch=${Date.now()}`;
 
     request({
@@ -490,7 +500,7 @@ export function getCategory(uri, { forceRefetch } = {}) {
       uri,
     }).then(
       (response) => {
-        const category = formatCategory(response);
+        const playlistGroup = formatPlaylistGroup(response);
 
         let playlists = [];
         const fetchPlaylists = (plEndpoint) => request({
@@ -498,13 +508,16 @@ export function getCategory(uri, { forceRefetch } = {}) {
           getState,
           endpoint: plEndpoint,
         }).then((response) => {
-          playlists = [...playlists, ...formatPlaylists(response.playlists.items)];
+          playlists = [
+            ...playlists,
+            ...formatPlaylists(response.playlists.items.filter((item) => item)),
+          ];
           if (response.playlists.next) {
             fetchPlaylists(response.playlists.next);
           } else {
             dispatch(coreActions.itemLoaded({
-              ...category,
-              playlists_uris: arrayOf('uri', playlists),
+              ...playlistGroup,
+              playlists_uris: uniq(arrayOf('uri', playlists)),
             }));
             dispatch(coreActions.itemsLoaded(playlists));
             dispatch(uiActions.stopLoading(loaderId));
@@ -601,7 +614,8 @@ export function getMore(endpoint, core_action = null, custom_action = null, extr
   };
 }
 
-export function getSearchResults({ type, term }, limit = 50, offset = 0) {
+export function getSearchResults(query, limit = 50, offset = 0) {
+  const { type, term } = query;
   const processKey = 'SPOTIFY_GET_SEARCH_RESULTS';
   return (dispatch, getState) => {
     const {
@@ -629,24 +643,21 @@ export function getSearchResults({ type, term }, limit = 50, offset = 0) {
         (response) => {
           if (response.tracks !== undefined) {
             dispatch(coreActions.searchResultsLoaded(
-              { term, type },
-              'tracks',
+              getSearchResultKey({ provider: 'spotify', type: 'tracks', term }),
               formatTracks(response.tracks.items),
             ));
           }
 
           if (response.artists !== undefined) {
             dispatch(coreActions.searchResultsLoaded(
-              { term, type },
-              'artists',
+              getSearchResultKey({ provider: 'spotify', type: 'artists', term }),
               formatArtists(response.artists.items),
             ));
           }
 
           if (response.albums !== undefined) {
             dispatch(coreActions.searchResultsLoaded(
-              { term, type },
-              'albums',
+              getSearchResultKey({ provider: 'spotify', type: 'albums', term }),
               formatAlbums(response.albums.items),
             ));
           }
@@ -657,8 +668,7 @@ export function getSearchResults({ type, term }, limit = 50, offset = 0) {
               can_edit: (meId === item.owner.id),
             }));
             dispatch(coreActions.searchResultsLoaded(
-              { term, type },
-              'playlists',
+              getSearchResultKey({ provider: 'spotify', type: 'playlists', term }),
               playlists,
             ));
           }
@@ -753,7 +763,7 @@ export function clearAutocompleteResults(field_id = null) {
   };
 }
 
-export function following(uri, method = 'GET') {
+export function following(uri, method = 'GET', callback) {
   return (dispatch, getState) => {
     const type = uriType(uri);
     let endpoint;
@@ -830,6 +840,7 @@ export function following(uri, method = 'GET') {
         } else {
           asset.in_library = is_following;
         }
+        if (callback) callback(asset.in_library);
 
         if (method === 'DELETE') {
           dispatch(coreActions.removeFromLibrary(`spotify:library:${type}s`, uri));
@@ -950,7 +961,10 @@ export function getArtist(uri, { full, forceRefetch } = {}) {
     }).then(
       (response) => {
         const artist = formatArtist(response);
-        dispatch(coreActions.itemLoaded(artist));
+        dispatch(coreActions.itemLoaded({
+          ...artist,
+          loading: full ? 'albums' : false,
+        }));
         dispatch(lastfmActions.getArtist(uri, artist.name, artist.mbid));
       },
     );
@@ -959,16 +973,20 @@ export function getArtist(uri, { full, forceRefetch } = {}) {
     if (full) {
       // All albums (gets all pages, may take some time to iterate them all)
       let albums = [];
+      let loading = 'albums';
       const fetchAlbums = (endpoint) => request({
         dispatch, getState, endpoint, uri,
       })
         .then((response) => {
           albums = [...albums, ...formatAlbums(response.items)];
           if (response.next) {
+            loading = 'albums';
             fetchAlbums(`${response.next}${forceRefetch ? `&refetch=${Date.now()}` : ''}`);
           } else {
+            loading = false;
             dispatch(coreActions.itemLoaded({
               uri,
+              loading,
               albums_uris: arrayOf('uri', albums),
             }));
             dispatch(coreActions.itemsLoaded(albums));
@@ -987,6 +1005,7 @@ export function getArtist(uri, { full, forceRefetch } = {}) {
           (response) => {
             dispatch(coreActions.itemLoaded({
               uri,
+              loading,
               tracks: formatTracks(response.tracks),
             }));
           },
@@ -1002,6 +1021,7 @@ export function getArtist(uri, { full, forceRefetch } = {}) {
           (response) => {
             dispatch(coreActions.itemLoaded({
               uri,
+              loading,
               related_artists: formatArtists(response.artists),
             }));
           },
@@ -1036,7 +1056,7 @@ export function playArtistTopTracks(uri) {
     // Do we have this artist (and their tracks) in our index already?
     if (artist && artist.tracks) {
       const uris = arrayOf('uri', artist.tracks);
-      dispatch(mopidyActions.playURIs(uris, uri));
+      dispatch(mopidyActions.playURIs({ uris, from: formatSimpleObject(artist) }));
     } else {
       let endpoint = `artists/${getFromUri('artistid', uri)}`;
       endpoint += `/top-tracks?country=${getState().spotify.country}`;
@@ -1044,7 +1064,7 @@ export function playArtistTopTracks(uri) {
         .then(
           (response) => {
             const uris = arrayOf('uri', response.tracks);
-            dispatch(mopidyActions.playURIs(uris, uri));
+            dispatch(mopidyActions.playURIs({ uris, from: formatSimpleObject(artist) }));
           },
         );
     }
@@ -1108,7 +1128,9 @@ export function getUser(uri, { full, forceRefetch } = {}) {
  *
  * @oaram uri string
  * */
-export function getAlbum(uri, { full, forceRefetch } = {}) {
+export function getAlbum(uri, options = {}) {
+  const { full, forceRefetch, callbackAction } = options;
+
   return (dispatch, getState) => {
     let endpoint = `albums/${getFromUri('albumid', uri)}`;
     if (forceRefetch) endpoint += `?refetch=${Date.now()}`;
@@ -1123,6 +1145,27 @@ export function getAlbum(uri, { full, forceRefetch } = {}) {
         dispatch(coreActions.itemLoaded({
           ...formatAlbum(response),
         }));
+
+        if (callbackAction) {
+          switch (callbackAction.name) {
+            case 'enqueue':
+              dispatch(mopidyActions.enqueueURIs({
+                uris: [uri],
+                from: formatContext(response),
+                ...callbackAction,
+              }));
+              break;
+            case 'play':
+              dispatch(mopidyActions.playURIs({
+                uris: [uri],
+                from: formatContext(response),
+                ...callbackAction,
+              }));
+              break;
+            default:
+              break;
+          }
+        }
 
         if (full) {
           let tracks = formatTracks(response.tracks.items);
@@ -1151,6 +1194,7 @@ export function getAlbum(uri, { full, forceRefetch } = {}) {
         }
       },
       (error) => {
+        dispatch(coreActions.removeItem(uri));
         dispatch(coreActions.handleException(
           'Could not load album',
           error,
@@ -1218,14 +1262,8 @@ export function createPlaylist(playlist) {
   };
 }
 
-export function savePlaylist(uri, name, description, is_public, is_collaborative, image) {
+export function savePlaylist(uri, { image, ...data }) {
   return (dispatch, getState) => {
-    const data = {
-      name,
-      description,
-      public: is_public,
-      collaborative: is_collaborative,
-    };
     const {
       spotify: {
         me: {
@@ -1300,7 +1338,7 @@ export function savePlaylist(uri, name, description, is_public, is_collaborative
   };
 }
 
-export function getPlaylistTracks(uri, { forceRefetch, callbackAction } = {}) {
+export function getPlaylistTracks(uri, { forceRefetch, callbackAction } = {}, playlist) {
   return (dispatch, getState) => {
     let initialEndpoint = `playlists/${getFromUri('playlistid', uri)}/tracks`;
     initialEndpoint += `?market=${getState().spotify.country}`;
@@ -1327,20 +1365,18 @@ export function getPlaylistTracks(uri, { forceRefetch, callbackAction } = {}) {
           if (callbackAction) {
             switch (callbackAction.name) {
               case 'enqueue':
-                dispatch(mopidyActions.enqueueURIs(
-                  arrayOf('uri', tracks),
-                  uri,
-                  callbackAction.play_next,
-                  callbackAction.at_position,
-                  callbackAction.offset,
-                ));
+                dispatch(mopidyActions.enqueueURIs({
+                  uris: arrayOf('uri', tracks),
+                  from: formatContext(playlist),
+                  ...callbackAction,
+                }));
                 break;
               case 'play':
-                dispatch(mopidyActions.playURIs(
-                  arrayOf('uri', tracks),
-                  uri,
-                  callbackAction.shuffle,
-                ));
+                dispatch(mopidyActions.playURIs({
+                  uris: arrayOf('uri', tracks),
+                  from: formatContext(playlist),
+                  ...callbackAction,
+                }));
                 break;
               default:
                 break;
@@ -1381,7 +1417,7 @@ export function getPlaylist(uri, options = {}) {
             description = description.split('<a href="spotify:user:').join('<a href="#' + '/user/spotify:user:');
           }
 
-          dispatch(coreActions.itemLoaded({
+          const playlist = {
             ...formatPlaylist(response),
             can_edit: (meId === response.owner.id),
             description,
@@ -1389,13 +1425,16 @@ export function getPlaylist(uri, options = {}) {
             // to accurately identify whether we've loaded *ALL* the tracks. Without this, it
             // doesn't know if we've loaded all tracks, or just the first page.
             tracks: null,
-          }));
+            loading: full ? 'tracks' : null,
+          };
+          dispatch(coreActions.itemLoaded(playlist));
 
           if (full) {
-            dispatch(getPlaylistTracks(uri, options));
+            dispatch(getPlaylistTracks(uri, options, playlist));
           }
         },
         (error) => {
+          dispatch(coreActions.removeItem(uri));
           dispatch(coreActions.handleException(
             'Could not load playlist',
             error,

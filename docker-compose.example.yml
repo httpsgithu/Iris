@@ -2,27 +2,32 @@ version: "3"
 services:
   snapserver:
     image: jaedb/snapserver
+    depends_on:
+      mopidy:
+        condition: service_healthy
     ports:
-      - 1704:1704
-      - 1705:1705
-      - 1780:1780
+      - 1704
+      - 1705
+      - 1780
     volumes:
-      - HOST_SNAPCAST_TEMP:/tmp
-      - ./docker/snapserver.conf:/etc/snapserver.conf
+      - /tmp/snapserver:/tmp
+      - ./docker/snapserver/snapserver.conf:/etc/snapserver.conf
+      - ./docker/snapserver/snapserver.json:/root/.config/snapserver/server.json
   mopidy:
     image: jaedb/iris
-    build:
-      context: .
-    depends_on:
-      - snapserver
+    environment:
+      - PIP_PACKAGES=Mopidy-YTMusic Mopidy-Tidal Mopidy-SoundCloud Mopidy-MusicBox-Webclient
     ports:
-      - 6600:6600
-      - 6680:6680
+      - 6600
+      - 6680
+    healthcheck:
+      test: curl -f http://localhost:6680/iris/http/get_config || exit 1
+      timeout: 5s
+      retries: 5
     volumes:
-      # Uncomment these lines to use a host-managed development build
-      #- ./mopidy_iris:/iris/mopidy_iris
-      #- ./IRIS_VERSION:/iris/IRIS_VERSION
-      - ./docker/data:/var/lib/mopidy/iris
-      - ./docker/mopidy.conf:/config/mopidy.conf
-      - HOST_MUSIC_DIRECTORY:/var/lib/mopidy/media
-      - HOST_SNAPCAST_TEMP:/tmp
+      # - ./mopidy/iris:/iris/mopidy/iris # To use a locally-built UI 
+      - ./docker/mopidy/iris:/var/lib/mopidy/iris # Iris-specific storage
+      - ./docker/mopidy/m3u:/var/lib/mopidy/m3u # To persist local playlists
+      - ./docker/mopidy/mopidy.conf:/config/mopidy.conf
+      - /mnt/Music:/var/lib/mopidy/media
+      - /tmp/snapserver:/tmp

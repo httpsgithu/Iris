@@ -1,87 +1,100 @@
 import React, { useState, useEffect } from 'react';
-import { connect, useSelector, useDispatch } from 'react-redux';
-import { bindActionCreators } from 'redux';
-import { find, groupBy, map } from 'lodash';
+import { useSelector, useDispatch } from 'react-redux';
+import { find, groupBy, map, isEmpty } from 'lodash';
 import VolumeControl from './VolumeControl';
 import MuteControl from './MuteControl';
 import Icon from '../Icon';
 import Thumbnail from '../Thumbnail';
 import LinksSentence from '../LinksSentence';
 import DropdownField from './DropdownField';
-import * as coreActions from '../../services/core/actions';
-import * as mopidyActions from '../../services/mopidy/actions';
 import * as pusherActions from '../../services/pusher/actions';
-import * as snapcastActions from '../../services/snapcast/actions';
+import {
+  setGroupStream,
+  setClientMute,
+  setClientVolume,
+  setStreamingEnabled,
+  controlStream,
+} from '../../services/snapcast/actions';
 import { sortItems, indexToArray } from '../../util/arrays';
-import { formatImages, digestMopidyImages } from '../../util/format';
 import { titleCase } from '../../util/helpers';
-import { I18n } from '../../locale';
+import { I18n, i18n } from '../../locale';
 import Link from '../Link';
+import ErrorBoundary from '../ErrorBoundary';
 
-const Header = ({ stream, server }) => {
+const Header = ({
+  stream,
+  server,
+}) => {
   const dispatch = useDispatch();
   const {
     id,
-    meta: {
-      name,
-      artists,
-      images: rawImages,
-    } = {},
     status,
-    uri: {
-      scheme,
-      query: {
-        control_url,
+    properties: {
+      playbackStatus,
+      canPlay,
+      canPause,
+      canControl,
+      metadata: {
+        title,
+        artist: artists = [],
+        artUrl,
       } = {},
-    },
+    } = {},
   } = stream || {};
-  const controlURL = control_url ? new URL(control_url) : null;
-  const controlServer = controlURL ? {
-    url: control_url,
-    ssl: controlURL.protocol === 'https:',
-    host: controlURL.hostname,
-    port: controlURL.port || (controlURL.protocol === 'https:' ? '443' : '80'),
-  } : null;
-  const images = rawImages ? formatImages(digestMopidyImages(controlServer, rawImages)) : null;
-  const current_server_id = useSelector((state) => state.mopidy.current_server);
-  const current_server = useSelector((state) => state.mopidy.servers[current_server_id]);
-  const isCurrentServer = control_url === current_server.url;
-  const isControlSwitchable = controlServer && !isCurrentServer;
-
-  const onClick = () => {
-    if (isControlSwitchable) {
-      dispatch(mopidyActions.setCurrentServer(controlServer));
-    }
-  };
+  let onClick = null;
+  switch (playbackStatus) {
+    case 'playing':
+      if (canPause) onClick = () => dispatch(controlStream(id, 'pause'));
+      break;
+    default:
+      if (canPlay) onClick = () => dispatch(controlStream(id, 'play'));
+      break;
+  }
 
   return (
     <div className="output-control__stream__header">
-      <Thumbnail
-        images={images}
-        size="small"
-        className="output-control__stream__header__thumbnail"
-      />
+      <div
+        className={[
+          'output-control__stream__header__art',
+          `output-control__stream__header__art--${onClick !== null ? playbackStatus : 'disabled'}`
+        ].join(' ')}
+        onClick={onClick}
+      >
+        <Thumbnail
+          image={artUrl}
+          size="small"
+        />
+      </div>
       <div className="output-control__stream__header__content">
         <h5 className="output-control__stream__header__title tooltip">
-          {isControlSwitchable ? (
-            <a onClick={onClick} style={{ cursor: 'pointer' }}>
-              {server?.name || id}
-            </a>
-          ) : (server?.name || id)}
-          {isCurrentServer && <Icon name="check" />}
-          {status === 'playing' && <Icon name="play_arrow" />}
-          {control_url && <div className="tooltip__content">{control_url}</div>}
+          {server?.name || id}
+          {!canControl && (
+            <span className="flag">
+              {i18n('snapcast.not_controllable').toUpperCase()}
+            </span>
+          )}
         </h5>
-        <ul className="details">
-          <li>{name || scheme}</li>
-          {artists && <li><LinksSentence items={artists} type="artist" nolinks /></li>}
-        </ul>
+        {!title && !artists?.length ? (
+          <div className="details">
+            <I18n path={`common.play_state.${playbackStatus || status}`} />
+          </div>
+        ) : (
+          <ul className="details">
+            <li>{title}</li>
+            {artists && (
+              <li>
+                <LinksSentence items={artists.map((name) => ({ name }))} type="artist" nolinks />
+              </li>
+            )}
+          </ul>
+        )}
       </div>
     </div>
   );
 };
 
 const Group = ({
+  setExpanded,
   group: {
     id: groupId,
     name: groupName,
@@ -91,7 +104,7 @@ const Group = ({
 }) => {
   const allClients = useSelector((state) => state.snapcast.clients || {});
   const allStreams = indexToArray(useSelector((state) => state.snapcast.streams || {}));
-  const clients = clients_ids.length > 0
+  const clients = clients_ids.length > 0 && Object.keys(allClients).length > 0
     ? clients_ids.map((c) => allClients[c]).filter((c) => c.connected)
     : [];
   const dispatch = useDispatch();
@@ -105,6 +118,7 @@ const Group = ({
           className="text"
           to={`/settings/services/snapcast/${groupId}`}
           scrollTo="#services-snapcast-groups"
+          onClick={() => setExpanded(false)}
         >
           {titleCase(groupName)}
         </Link>
@@ -115,7 +129,7 @@ const Group = ({
           options={allStreams.map((s) => ({ value: s.id, label: titleCase(s.id) }))}
           noLabel
           handleChange={
-            (value) => dispatch(snapcastActions.setGroupStream(groupId, value))
+            (value) => dispatch(setGroupStream(groupId, value))
           }
         />
       </h5>
@@ -137,14 +151,14 @@ const Group = ({
                   noTooltip
                   mute={mute}
                   onMuteChange={
-                    (value) => dispatch(snapcastActions.setClientMute(clientId, value))
+                    (value) => dispatch(setClientMute(clientId, value))
                   }
                 />
                 <VolumeControl
                   volume={volume}
                   mute={mute}
                   onVolumeChange={
-                    (value) => dispatch(snapcastActions.setClientVolume(clientId, value))
+                    (value) => dispatch(setClientVolume(clientId, value))
                   }
                 />
               </div>
@@ -156,23 +170,16 @@ const Group = ({
   );
 };
 
-const Outputs = () => {
-  const snapcastEnabled = useSelector((state) => state.snapcast.enabled);
-  if (!snapcastEnabled) {
-    return (
-      <p className="no-results">
-        <I18n path="playback_controls.snapcast_not_enabled" />
-      </p>
-    );
-  }
-
+const Outputs = ({ setExpanded }) => {
+  const dispatch = useDispatch();
   const allGroups = indexToArray(useSelector((state) => state.snapcast.groups || {}));
   const allStreams = useSelector((state) => state.snapcast.streams || {});
   const allServers = indexToArray(useSelector((state) => state.mopidy.servers || {}));
   const groupsByStream = groupBy(allGroups, 'stream_id');
+  const { streaming_enabled } = useSelector((state) => state?.snapcast || {});
 
   return (
-    <>
+    <ErrorBoundary>
       {map(groupsByStream, (groups, id) => {
         const stream = {
           id,
@@ -183,49 +190,65 @@ const Outputs = () => {
         return (
           <div className="output-control__stream" key={`stream_${id}`}>
             <Header stream={stream} />
-            {groups.map((group) => <Group group={group} key={`group_${group.id}`} />)}
+            {
+              groups.map(
+                (group) => (
+                  <Group setExpanded={setExpanded} group={group} key={`group_${group.id}`} />
+                )
+              )
+            }
           </div>
         );
       })}
-    </>
+      <div className="field checkbox" style={{ paddingLeft: 12 }}>
+        <label>
+          <input
+            type="checkbox"
+            name="streaming_enabled"
+            checked={streaming_enabled}
+            onChange={() => dispatch(setStreamingEnabled(!streaming_enabled))}
+          />
+          <span className="label">
+            <I18n path="snapcast.stream_on_this_device" />
+          </span>
+        </label>
+      </div>
+    </ErrorBoundary>
   );
 }
 
-const Commands = () => {
+const Commands = ({ commands }) => {
   const dispatch = useDispatch();
-  const commandsObj = useSelector((state) => state.pusher.commands || {});
-  if (!commandsObj) return null;
 
-  let items = indexToArray(commandsObj);
+  let items = indexToArray(commands);
   if (items.length <= 0) return null;
 
   items = sortItems(items, 'sort_order');
 
   return (
-    <div className="output-control__commands commands">
-      {
-        items.map((command) => (
-          <div
-            key={command.id}
-            className="commands__item commands__item--interactive"
-            onClick={() => dispatch(pusherActions.runCommand(command.id))}
-          >
-            <Icon className="commands__item__icon" name={command.icon} />
-            <span className={`${command.colour}-background commands__item__background`} />
-          </div>
-        ))
-      }
-    </div>
+    <ErrorBoundary>
+      <div className="output-control__commands commands">
+        {
+          items.map((command) => (
+            <div
+              key={command.id}
+              className="commands__item commands__item--interactive"
+              onClick={() => dispatch(pusherActions.runCommand(command.id))}
+            >
+              <Icon className="commands__item__icon" name={command.icon} />
+              <span className={`${command.colour}-background commands__item__background`} />
+            </div>
+          ))
+        }
+      </div>
+    </ErrorBoundary>
   );
 };
 
 const OutputControl = ({ force_expanded }) => {
+  const snapcastEnabled = useSelector((state) => state.snapcast.enabled);
+  const commands = useSelector((state) => state.pusher.commands);
   const [expanded, setExpanded] = useState(false);
-  const handleClick = (e) => {
-    if (!force_expanded && $(e.target).closest('.output-control').length <= 0) {
-      setExpanded(false);
-    }
-  };
 
   useEffect(() => {
     if (force_expanded && !expanded) {
@@ -233,19 +256,12 @@ const OutputControl = ({ force_expanded }) => {
     }
   }, [force_expanded]);
 
-  useEffect(() => {
-    if (expanded) {
-      window.addEventListener('click', handleClick, false);
-    } else {
-      window.removeEventListener('click', handleClick, false);
-    }
-  }, [expanded]);
+  if (!snapcastEnabled && isEmpty(commands)) return null;
 
   if (expanded) {
-    const outputs = <Outputs />;
-    const commands = <Commands />;
     return (
       <span className="output-control">
+        {!force_expanded && <div className="click-outside" onClick={() => setExpanded(false)} />}
         <button
           className="control speakers active"
           onClick={() => setExpanded(false)}
@@ -253,8 +269,8 @@ const OutputControl = ({ force_expanded }) => {
           <Icon name="speaker" />
         </button>
         <div className="output-control__inner">
-          {commands}
-          {outputs}
+          {!isEmpty(commands) && <Commands commands={commands} />}
+          {snapcastEnabled && <Outputs setExpanded={setExpanded} />}
         </div>
       </span>
     );

@@ -1,11 +1,7 @@
 import React from 'react';
 import { connect, useDispatch } from 'react-redux';
 import { bindActionCreators } from 'redux';
-import { Route, Link } from 'react-router-dom';
-import localForage from 'localforage';
-import ConfirmationButton from '../components/Fields/ConfirmationButton';
 import PusherConnectionList from '../components/PusherConnectionList';
-import SourcesPriority from '../components/Fields/SourcesPriority';
 import Commands from '../components/Fields/Commands';
 import TextField from '../components/Fields/TextField';
 import SelectField from '../components/Fields/SelectField';
@@ -22,7 +18,7 @@ import * as spotifyActions from '../services/spotify/actions';
 import { isHosted } from '../util/helpers';
 import { i18n, I18n, languagesAvailable } from '../locale';
 import Button from '../components/Button';
-import { dater } from '../components/Dater';
+import Dater, { dater } from '../components/Dater';
 
 const CheckboxSetting = ({
   name,
@@ -205,14 +201,14 @@ class Settings extends React.Component {
             </div>
           </label>
 
-          <Route path="/settings/:server?/:id?" component={Servers} />
+          <Servers />
 
           <h4 className="underline">
             <I18n path="settings.services.title" />
             <a name="services" />
           </h4>
 
-          <Route path="/settings/:services?/:service?/:id?" component={Services} />
+          <Services />
 
           <h4 className="underline">
             <I18n path="settings.interface.title" />
@@ -330,22 +326,6 @@ class Settings extends React.Component {
             </div>
           </div>
 
-          <div className="field sources-priority">
-            <div className="name">
-              <I18n path="settings.interface.sources_priority.label" />
-            </div>
-            <div className="input">
-              <SourcesPriority
-                uri_schemes={mopidy.uri_schemes ? mopidy.uri_schemes : []}
-                uri_schemes_priority={ui.uri_schemes_priority ? ui.uri_schemes_priority : []}
-                uiActions={uiActions}
-              />
-              <div className="description">
-                <I18n path="settings.interface.sources_priority.description" />
-              </div>
-            </div>
-          </div>
-
           {isHosted() ? null : (
             <div className="field checkbox">
               <div className="name">
@@ -376,7 +356,7 @@ class Settings extends React.Component {
                 runCommand={(id, notify) => runCommand(id, notify)}
                 onChange={(commands) => setCommands(commands)}
               />
-              <Button to="/edit-command">
+              <Button to="/modal/edit-command">
                 <I18n path="actions.add" />
               </Button>
             </div>
@@ -466,25 +446,35 @@ class Settings extends React.Component {
                   {window.build}
                   {window.build && (
                     <span className="tooltip__content">
-                      {`${dater('ago', parseInt(window.build, 10) * 1000)} ago`}
+                      <Dater data={parseInt(window.build, 10) * 1000} type="ago" />
+                      {' ago'}
                     </span>
                   )}
                 </span>
                 {pusher.version.upgrade_available ? (
-                  <a
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flag flag--dark"
-                    href={`https://github.com/jaedb/Iris/releases/tag/${pusher.version.latest}`}
-                  >
-                    <Icon name="cloud_download" className="blue-text" />
-                    <I18n
-                      path="settings.advanced.version.upgrade_available"
-                      version={pusher.version.latest}
+                  <>
+                    <a
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flag flag--dark flag--inline"
+                      href={`https://github.com/jaedb/Iris/releases/tag/${pusher.version.latest}`}
                     >
-                      {' '}
-                    </I18n>
-                  </a>
+                      <Icon name="cloud_download" className="blue-text" />
+                      <I18n
+                        path="settings.advanced.version.upgrade_available"
+                        version={pusher.version.latest}
+                      >
+                        {' '}
+                      </I18n>
+                    </a>
+                    <Button
+                      type="secondary"
+                      onClick={this.doUpgrade}
+                      tracking={{ category: 'System', action: 'Upgrade', label: pusher.version.latest }}
+                    >
+                      <I18n path="settings.advanced.version.upgrade" version={pusher.version.latest} />
+                    </Button>
+                  </>
                 ) : (
                   <span className="flag flag--dark">
                     <Icon name="check" className="green-text" />
@@ -498,22 +488,23 @@ class Settings extends React.Component {
           </div>
 
           <div className="field">
-            {this.renderLocalScanButton()}
-            <Button to="/share-configuration">
-              <I18n path="settings.advanced.share_configuration" />
-            </Button>
+            <div className="name">
+              <I18n path="settings.advanced.shared_configuration.label" />
+            </div>
+            <div className="input">
+              <Button to="/modal/share-config">
+                <I18n path="settings.advanced.shared_configuration.share" />
+              </Button>
+              {pusher.shared_config && (
+                <Button to="/modal/import-config/server">
+                  <I18n path="settings.advanced.shared_configuration.import" />
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="field">
-            {pusher.version.upgrade_available && (
-              <Button
-                type="secondary"
-                onClick={this.doUpgrade}
-                tracking={{ category: 'System', action: 'Upgrade', label: pusher.version.latest }}
-              >
-                <I18n path="settings.advanced.version.upgrade" version={pusher.version.latest} />
-              </Button>
-            )}
+            {this.renderLocalScanButton()}
             <Button
               type="destructive"
               working={mopidy.restarting}
@@ -523,7 +514,7 @@ class Settings extends React.Component {
               <I18n path="settings.advanced.restart" />
             </Button>
             <Button
-              to="/reset"
+              to="/modal/reset"
               type="destructive"
             >
               <I18n path="settings.advanced.reset" />
@@ -551,22 +542,22 @@ class Settings extends React.Component {
           <br />
           <div>
             <Button
-              href="https://www.paypal.com/cgi-bin/webscr?cmd=_donations&business=james%40barnsley%2enz&lc=NZ&item_name=James%20Barnsley&currency_code=USD&bn=PP%2dDonationsBF%3abtn_donate_LG%2egif%3aNonHosted"
-              target="_blank"
-              tracking={{ category: 'About', action: 'Paypal' }}
-            >
-              <I18n path="settings.about.donate">
-                <Icon type="fontawesome" name="paypal" />
-                {' '}
-              </I18n>
-            </Button>
-            <Button
               href="https://github.com/jaedb/Iris"
               target="_blank"
               tracking={{ category: 'About', action: 'GitHub' }}
             >
               <I18n path="settings.about.github">
                 <Icon type="fontawesome" name="github" />
+                {' '}
+              </I18n>
+            </Button>
+            <Button
+              href="https://github.com/sponsors/jaedb"
+              target="_blank"
+              tracking={{ category: 'About', action: 'Sponsor' }}
+            >
+              <I18n path="settings.about.sponsor">
+                <Icon type="fontawesome" name="heart" />
                 {' '}
               </I18n>
             </Button>

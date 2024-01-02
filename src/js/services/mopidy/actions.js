@@ -327,23 +327,28 @@ export function changeTrack(tlid) {
  * Playing assets
  * */
 
-export function playURIs(uris = [], from_uri = null, shuffle = false) {
+export function playURIs({
+  uris = [],
+  from = null,
+  shuffle = false,
+}) {
   return {
     type: 'MOPIDY_PLAY_URIS',
     uris,
-    from_uri,
+    from,
     shuffle,
   };
 }
 
-export function playAlbum(uri) {
+export function playAlbum({ uri, from }) {
   return {
     type: 'MOPIDY_PLAY_ALBUM',
     uri,
+    from,
   };
 }
 
-export function playPlaylist(uri, shuffle = false) {
+export function playPlaylist({ uri, shuffle = false }) {
   return {
     type: 'MOPIDY_PLAY_PLAYLIST',
     uri,
@@ -351,29 +356,49 @@ export function playPlaylist(uri, shuffle = false) {
   };
 }
 
-export function enqueueURIs(uris = [], from_uri = null, play_next = false, at_position = null, offset = 0) {
+export function enqueueURIs({
+  uris = [],
+  from = null,
+  shuffle = false,
+  at_position = null,
+  play_next = false,
+  offset = 0,
+}) {
   return {
     type: 'MOPIDY_ENQUEUE_URIS',
     uris,
-    from_uri,
+    from,
+    shuffle,
     at_position,
     play_next,
     offset,
   };
 }
 
-export function enqueueAlbum(uri, next = false, at_position = null) {
+export function enqueueAlbum({
+  uri,
+  from,
+  play_next = false,
+  at_position = null,
+}) {
   return {
     type: 'MOPIDY_ENQUEUE_ALBUM',
     uri,
-    next,
+    from,
+    play_next,
     at_position,
   };
 }
 
-export function enqueuePlaylist(uri, play_next = false, at_position = null) {
+export function enqueuePlaylist({
+  uri,
+  from,
+  play_next = false,
+  at_position = null,
+}) {
   return {
     type: 'MOPIDY_ENQUEUE_PLAYLIST',
+    from,
     uri,
     play_next,
     at_position,
@@ -452,10 +477,32 @@ export function deletePlaylist(uri) {
   };
 }
 
+export function getLibraryMoods(uri) {
+  return {
+    type: 'MOPIDY_GET_LIBRARY_MOODS',
+    uri,
+  };
+}
+
+export function getLibraryFeaturedPlaylists(uri) {
+  return {
+    type: 'MOPIDY_GET_LIBRARY_FEATURED_PLAYLISTS',
+    uri,
+  };
+}
+
 export function getLibraryPlaylists(uri) {
   return {
     type: 'MOPIDY_GET_LIBRARY_PLAYLISTS',
     uri,
+  };
+}
+
+export function getPlaylistGroup(uri, options) {
+  return {
+    type: 'MOPIDY_GET_PLAYLIST_GROUP',
+    uri,
+    options,
   };
 }
 
@@ -544,12 +591,12 @@ export function clearSearchResults() {
   };
 }
 
-export function getSearchResults(query, limit = 100, uri_schemes) {
+export function getSearchResults(query, providers, limit = 100) {
   return {
     type: 'MOPIDY_GET_SEARCH_RESULTS',
     query,
+    providers,
     limit,
-    uri_schemes,
   };
 }
 

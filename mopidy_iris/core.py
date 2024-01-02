@@ -39,10 +39,7 @@ class IrisCore(pykka.ThreadingActor):
         "seed_tracks": [],
         "results": [],
     }
-    data = {
-        "commands": [],
-        "pinned": [],
-    }
+    data = {}
     ioloop = None
 
     @classmethod
@@ -60,9 +57,9 @@ class IrisCore(pykka.ThreadingActor):
     def start(self):
         logger.info("Starting Iris " + Extension.version)
 
-        # Load our commands and pinned items from file
         self.data["commands"] = self.load_from_file("commands")
         self.data["pinned"] = self.load_from_file("pinned")
+        self.data["shared_config"] = self.load_from_file("shared_config")
 
     ##
     # Mopidy is shutting down
@@ -398,6 +395,7 @@ class IrisCore(pykka.ThreadingActor):
                 "snapcast_enabled": self.config["iris"]["snapcast_enabled"],
                 "snapcast_host": self.config["iris"]["snapcast_host"],
                 "snapcast_port": self.config["iris"]["snapcast_port"],
+                "snapcast_ssl": self.config["iris"]["snapcast_ssl"],
                 "snapcast_stream": self.config["iris"]["snapcast_stream"],
                 "spotify_authorization_url": self.config["iris"][
                     "spotify_authorization_url"
@@ -408,6 +406,7 @@ class IrisCore(pykka.ThreadingActor):
                 "genius_authorization_url": self.config["iris"][
                     "genius_authorization_url"
                 ],
+                "shared_config": self.data["shared_config"],
             }
         }
 
@@ -750,28 +749,22 @@ class IrisCore(pykka.ThreadingActor):
             self.add_radio_metadata(added)
 
     def add_radio_metadata(self, added):
-        seeds = ""
+        seeds = []
         if len(self.radio["seed_artists"]) > 0:
-            seeds = seeds + (",".join(self.radio["seed_artists"])).replace(
-                "spotify:artist:", "spotify_artist_"
-            )
+            seeds = seeds + self.radio["seed_artists"]
         if len(self.radio["seed_tracks"]) > 0:
-            if seeds != "":
-                seeds = seeds + ","
-            seeds = seeds + (",".join(self.radio["seed_tracks"])).replace(
-                "spotify:track:", "spotify_track_"
-            )
+            seeds = seeds + self.radio["seed_tracks"]
         if len(self.radio["seed_genres"]) > 0:
-            if seeds != "":
-                seeds = seeds + ","
-            seeds = seeds + (",".join(self.radio["seed_genres"])).replace(
-                "spotify:genre:", "spotify_genre_"
-            )
+            seeds = seeds + self.radio["seed_genres"]
 
         metadata = {
             "tlids": [],
             "added_by": "Radio",
-            "added_from": "iris:radio:" + seeds,
+            "added_from": {
+                "name": "Radio",
+                "type": "radio",
+                "seeds": seeds
+            }
         }
         for added_tltrack in added.get():
             metadata["tlids"].append(added_tltrack.tlid)
@@ -883,6 +876,16 @@ class IrisCore(pykka.ThreadingActor):
 
     def set_pinned(self, *args, **kwargs):
         return self.set_data("pinned", *args, **kwargs)
+
+    ##
+    # Portable configuration template for other users to import
+    ##
+
+    def get_shared_config(self, *args, **kwargs):
+        return self.get_data("shared_config", *args, **kwargs)
+
+    def set_shared_config(self, *args, **kwargs):
+        return self.set_data("shared_config", *args, **kwargs)
 
     ##
     # Commands
@@ -1194,10 +1197,8 @@ class IrisCore(pykka.ThreadingActor):
         }
 
         try:
-            http_client = AsyncHTTPClient()
-            response = await http_client.fetch(
-                url, method="POST", body=json.dumps(data)
-            )
+            http_client = AsyncHTTPClient(validate_cert=self.config["iris"]["verify_certificates"])
+            response = await http_client.fetch(url, method="POST", body=json.dumps(data))
         except (urllib.error.HTTPError, urllib.error.URLError) as e:
             error = json.loads(e.read())
             logger.error("Could not update Snapcast meta")

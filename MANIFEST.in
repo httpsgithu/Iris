@@ -7,10 +7,14 @@ include mopidy_iris/ext.conf
 include mopidy_iris/system.sh
 include IRIS_VERSION
 include Dockerfile
+include Dockerfile.alpine
 include pyproject.toml
 include screenshot.jpg
 include tox.ini
+include *.lock
 recursive-exclude src *
+recursive-exclude docker *
 exclude .jshintrc
 exclude .babelrc
 exclude jest.config.js
+exclude .nvmrc

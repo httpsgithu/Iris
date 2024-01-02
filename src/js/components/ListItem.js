@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useHistory, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useDrag } from 'react-dnd';
 import LinksSentence from './LinksSentence';
 import { dater } from './Dater';
 import { nice_number } from './NiceNumber';
 import URILink from './URILink';
-import ContextMenuTrigger from './ContextMenuTrigger';
+import ContextMenuTrigger from './ContextMenu/ContextMenuTrigger';
 import Icon, { SourceIcon } from './Icon';
 import Thumbnail from './Thumbnail';
 import Popularity from './Popularity';
@@ -16,6 +17,7 @@ import { updateScrollPosition } from './Link';
 import * as uiActions from '../services/ui/actions';
 import * as mopidyActions from '../services/mopidy/actions';
 import * as spotifyActions from '../services/spotify/actions';
+import { isTouchDevice } from '../util/helpers';
 
 const getValue = (item = {}, name = '') => {
   const { [name]: value } = item;
@@ -27,6 +29,13 @@ const getValue = (item = {}, name = '') => {
       } = item;
       if (!total && !value) return null;
       return <I18n path="specs.tracks" count={nice_number(total || value.length)} />;
+    }
+    case 'playlists': {
+      const {
+        playlists_uris: array = [],
+      } = item;
+      if (!array.length) return null;
+      return <I18n path="specs.playlists" count={nice_number(array.length)} />;
     }
     case 'artists': {
       const {
@@ -89,8 +98,12 @@ const ListItem = ({
 
   const dispatch = useDispatch();
   const spotify_available = useSelector((state) => state.spotify.access_token);
-  const history = useHistory();
+  const navigate = useNavigate();
   const location = useLocation();
+  const [_, drag] = useDrag({
+    type: item?.type?.toUpperCase() || 'UNKNOWN',
+    item: { item, context: item },
+  });
 
   // Load images
   useEffect(() => {
@@ -115,10 +128,8 @@ const ListItem = ({
     dispatch(
       uiActions.showContextMenu({
         e,
-        context: item.type,
-        uris: [item.uri],
-        items: [item],
-        tracklist_uri: item.uri, // not needed?
+        type: item.type,
+        item,
       }),
     );
   };
@@ -143,9 +154,9 @@ const ListItem = ({
     }
 
     if (e.target.tagName.toLowerCase() !== 'a') {
-      updateScrollPosition({ location, history });
+      updateScrollPosition({ location, navigate });
       e.preventDefault();
-      history.push(to);
+      navigate(to);
     }
   };
 
@@ -161,6 +172,7 @@ const ListItem = ({
       className={className}
       onContextMenu={onContextMenu}
       onClick={onClick}
+      ref={isTouchDevice() ? undefined : drag}
     >
       {
         right_column && !nocontext && (

@@ -21,7 +21,8 @@ const SmartListBatch = handleViewport(
     // Listen for changes to our height, and pass it up to our Grid. This is then used to build the
     // placeholder elements when out of viewport. We only care about the first item because this
     // represents the same heights for everything else (in almost all circumstances).
-    const { current: { clientHeight } = {} } = forwardedRef;
+    const { current } = forwardedRef;
+    const { clientHeight } = current || {};
     useEffect(() => {
       if (isFirst && clientHeight !== itemHeight) {
         setItemHeight(clientHeight);
@@ -43,7 +44,7 @@ const SmartListBatch = handleViewport(
             {
               items.map((item, index) => (
                 <ItemComponent
-                  key={`${index}_${item.uri || item.name}`}
+                  key={`uri-${item.uri}__name-${item.name}__tlid-${item.tlid}`}
                   item={item}
                   getItemIndex={() => itemIndex(batchIndex, index)}
                   {...itemProps}

@@ -10,7 +10,6 @@
 @import 'components/context-menu';
 @import 'components/lists';
 @import 'components/loader';
-@import 'components/dragger';
 @import 'components/images';
 @import 'components/parallax';
 @import 'components/icon';
@@ -25,7 +24,6 @@
 @import 'components/dropdown-field';
 @import 'components/autocomplete-field';
 @import 'components/filter-field';
-@import 'components/sources-priority-field';
 @import 'components/sub-views';
 @import 'components/sub-tabs';
 @import 'components/debug';
@@ -37,10 +35,10 @@
 @import 'components/commands';
 @import 'components/related-artists';
 @import 'components/error-message';
-@import 'components/sortable';
 @import 'components/mute-control';
 @import 'components/select-field';
 @import 'components/pin-list';
+@import 'components/dropzones';
 
 @import 'views/artist';
 @import 'views/user';

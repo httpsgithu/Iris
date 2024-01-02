@@ -177,11 +177,10 @@ const CoreMiddleware = (function () {
 
       case 'START_SEARCH': {
         const { query } = action;
+        const { term = '', providers = [], type = 'all' } = query;
         const {
           ui: {
             allow_reporting,
-            uri_schemes_search_enabled = [],
-            search_settings,
           },
         } = store.getState();
 
@@ -189,65 +188,22 @@ const CoreMiddleware = (function () {
           ReactGA.event({
             category: 'Search',
             action: 'Started',
-            label: `${query.type}: ${query.term}`,
+            label: `${type}: ${term}`,
           });
         }
 
-        console.info(`Searching for ${query.type} matching "${query.term}"`);
+        console.info(`Searching ${providers.length} providers for ${type} matching "${term}"`);
 
         // Trigger reducer immediately; this will hose out any previous results
         next(action);
 
-        if (uri_schemes_search_enabled.includes('spotify:')) {
-          if (!search_settings || search_settings.spotify) {
-            store.dispatch(spotifyActions.getSearchResults(query));
-          }
+        if (providers.includes('spotify')) {
+          store.dispatch(spotifyActions.getSearchResults(query));
         }
         store.dispatch(mopidyActions.getSearchResults(
           query,
-          100,
-          uri_schemes_search_enabled.filter((i) => i !== 'spotify:'), // Omit Spotify; handled above
+          providers.filter((i) => i !== 'spotify'), // Omit Spotify; handled above
         ));
-        break;
-      }
-
-      case 'SEARCH_RESULTS_LOADED': {
-        const {
-          query: {
-            term,
-            type,
-          },
-          resultType,
-          results,
-        } = action;
-        const {
-          core: {
-            search_results: {
-              query: {
-                term: prevTerm,
-                type: prevType,
-              } = {},
-              ...allResults
-            } = {},
-          } = {},
-        } = store.getState();
-
-        // Add to our existing results, so long as the search term is the same
-        const search_results = {
-          query: { term, type },
-          ...(term === prevTerm && type === prevType ? allResults : {}),
-        };
-
-        // Merge our new results with the existing (if any)
-        search_results[resultType] = [
-          ...(search_results[resultType] || []),
-          ...results,
-        ];
-
-        next({
-          ...action,
-          search_results,
-        });
         break;
       }
 
@@ -275,10 +231,8 @@ const CoreMiddleware = (function () {
           case 'spotify':
             store.dispatch(spotifyActions.getPlaylist(key, {}));
             break;
-          case 'm3u':
-            store.dispatch(mopidyActions.getPlaylist(key, {}));
-            break;
           default:
+            store.dispatch(mopidyActions.getPlaylist(key, {}));
             break;
         }
         next(action);
@@ -360,6 +314,7 @@ const CoreMiddleware = (function () {
             options,
           });
         });
+        next(action);
         break;
       }
 
@@ -499,6 +454,28 @@ const CoreMiddleware = (function () {
         break;
       }
 
+      case 'LOAD_PLAYLIST_GROUP': {
+        const fetch = () => {
+          switch (uriSource(action.uri)) {
+            case 'spotify':
+              store.dispatch(spotifyActions.getMood(action.uri, action.options));
+              break;
+            default:
+              store.dispatch(mopidyActions.getPlaylistGroup(action.uri, action.options));
+              break;
+          }
+        };
+        ensureLoaded({
+          store,
+          action,
+          fetch,
+          dependents: ['playlists_uris'],
+          type: 'playlist',
+        });
+        next(action);
+        break;
+      }
+
       case 'LOAD_USER': {
         const fetch = () => {
           switch (uriSource(action.uri)) {
@@ -523,28 +500,6 @@ const CoreMiddleware = (function () {
         next(action);
         break;
       }
-
-      case 'LOAD_CATEGORY':
-        const fetch = () => {
-          switch (uriSource(action.uri)) {
-            case 'spotify':
-              store.dispatch(spotifyActions.getCategory(action.uri, action.options));
-              break;
-            default:
-              // No mopidy category model
-              break;
-          }
-        };
-        ensureLoaded({
-          store,
-          action,
-          fetch,
-          fullDependents: ['playlists_uris'],
-          type: 'category',
-        });
-
-        next(action);
-        break;
 
       case 'LOAD_LIBRARY':
         store.dispatch(uiActions.startLoading(action.uri, action.uri));
@@ -649,8 +604,10 @@ const CoreMiddleware = (function () {
 
       case 'QUEUE_LOADED':
         store.dispatch(coreActions.tracksLoaded(action.tracks));
-        action.tracks = formatTracks(action.tracks);
-        next(action);
+        next({
+          ...action,
+          tracks: formatTracks(action.tracks),
+        });
         break;
 
       case 'ITEMS_LOADED':
@@ -658,11 +615,12 @@ const CoreMiddleware = (function () {
         action.items.forEach((item) => {
           mergedItems.push({
             ...core.items[item.uri] || {},
+            loading: false, // Action can still override this
             ...item,
           });
         });
 
-        store.dispatch(uiActions.stopLoading(arrayOf('uri', action.items)));
+        store.dispatch(uiActions.stopLoading(arrayOf('uri', action.items))); // TODO Deprecate
         store.dispatch(coreActions.updateColdStore(mergedItems));
         next({
           ...action,

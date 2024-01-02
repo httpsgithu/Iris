@@ -12,7 +12,7 @@
 	z-index: 99;
 	font-size: 13px;
 	font-weight: 500;
-	font-family: "Overpass";
+	font-family: $font-family-alt;
 
 	&__section {
 		@include animate();
@@ -58,6 +58,12 @@
 		display: block;
 		overflow-x: hidden;
 
+		&--disabled {
+			pointer-events: none;
+			cursor: default;
+			opacity: 0.5;
+		}
+
 		&__link {
 			@include gradient_overlay(3px);
 			cursor: pointer;
@@ -100,7 +106,8 @@
 		}
 
 		&--loader {
-			padding-top: 75%;
+			text-align: center;
+			margin-top: 50%;
 		}
 	}
 	

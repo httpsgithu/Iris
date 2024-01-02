@@ -164,11 +164,11 @@ export function toggleSidebar(new_state = 'toggle') {
   return action;
 }
 
-export function dragStart(e, context, from_uri = null, victims, victims_indexes = null) {
+export function dragStart(e, context, source = null, victims, victims_indexes = null) {
   return {
     type: 'DRAG_START',
     context,
-    from_uri,
+    source,
     victims,
     victims_indexes,
     start_x: e.clientX,
@@ -262,6 +262,24 @@ export function removeNotification(key, manual = false) {
     type: 'REMOVE_NOTIFICATION',
     key,
     manual,
+  };
+}
+
+export function openModal(name, props) {
+  return {
+    type: 'OPEN_MODAL',
+    name,
+    modal_state: {
+      name,
+      props,
+    },
+  };
+}
+
+export function closeModal(url) {
+  return {
+    type: 'CLOSE_MODAL',
+    url,
   };
 }
 

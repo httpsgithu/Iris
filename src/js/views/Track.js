@@ -9,7 +9,7 @@ import LinksSentence from '../components/LinksSentence';
 import LastfmLoveButton from '../components/Fields/LastfmLoveButton';
 import { Dater } from '../components/Dater';
 import SelectField from '../components/Fields/SelectField';
-import ContextMenuTrigger from '../components/ContextMenuTrigger';
+import ContextMenuTrigger from '../components/ContextMenu/ContextMenuTrigger';
 import Icon from '../components/Icon';
 import Loader from '../components/Loader';
 import * as coreActions from '../services/core/actions';
@@ -22,8 +22,9 @@ import { sourceIcon } from '../util/helpers';
 import { i18n, I18n } from '../locale';
 import Button from '../components/Button';
 import { makeLoadingSelector, makeItemSelector } from '../util/selectors';
-import { decodeUri, encodeUri } from '../util/format';
+import { decodeUri, encodeUri, formatSimpleObject } from '../util/format';
 import URILink from '../components/URILink';
+import { withRouter } from '../util';
 
 const LyricsSelector = ({
   track: {
@@ -70,13 +71,11 @@ const LyricsSelector = ({
 
 const LyricsContent = ({
   authorized,
-  loading,
   track: {
     lyrics,
     lyrics_path,
   } = {},
 }) => {
-  if (loading) return <Loader mini />;
   if (!lyrics && !authorized) {
     return (
       <p className="no-results">
@@ -108,7 +107,6 @@ const LyricsContent = ({
 };
 
 const Lyrics = ({
-  loading,
   authorized,
   track,
   getTrackLyrics,
@@ -116,7 +114,6 @@ const Lyrics = ({
   <>
     <h4>
       <I18n path="track.lyrics" />
-      {loading && <Loader loading mini />}
     </h4>
 
     <LyricsSelector
@@ -197,19 +194,29 @@ class Track extends React.Component {
 
     showContextMenu({
       e,
-      context: 'track',
-      items: [track],
-      uris: [uri],
+      item: track,
+      type: 'track',
     });
   }
 
   play = () => {
     const {
       uri,
+      track: {
+        name,
+      } = {},
       mopidyActions: { playURIs },
     } = this.props;
 
-    playURIs([uri], uri);
+    playURIs({
+      uris: [uri],
+      from: {
+        uri,
+        name,
+        type: 'track',
+        context: 'track',
+      },
+    });
   }
 
   render = () => {
@@ -252,7 +259,13 @@ class Track extends React.Component {
         )}
 
         <div className="thumbnail-wrapper">
-          <Thumbnail size="large" canZoom images={track.images} type="album" />
+          <Thumbnail
+            size="large"
+            images={track.images}
+            type="album"
+            loading={loading || loadingLyrics}
+            canZoom
+          />
         </div>
 
         <div className="title">
@@ -316,7 +329,6 @@ class Track extends React.Component {
         </div>
 
         <Lyrics
-          loading={loadingLyrics}
           authorized={genius_authorized}
           getTrackLyrics={getTrackLyrics}
           track={track}
@@ -328,7 +340,7 @@ class Track extends React.Component {
 }
 
 const mapStateToProps = (state, ownProps) => {
-  const uri = decodeUri(ownProps.match.params.uri);
+  const uri = decodeUri(ownProps.params.uri);
   const loadingSelector = makeLoadingSelector([`(.*)${uri}(.*)`, '^((?!genius).)*$', '^((?!contains).)*$']);
   const loadingLyricsSelector = makeLoadingSelector([`^genius_(.*)lyrics_${uri}$`]);
   const trackSelector = makeItemSelector(uri);
@@ -356,4 +368,4 @@ const mapDispatchToProps = (dispatch) => ({
   geniusActions: bindActionCreators(geniusActions, dispatch),
 });
 
-export default connect(mapStateToProps, mapDispatchToProps)(Track);
+export default withRouter(connect(mapStateToProps, mapDispatchToProps)(Track));

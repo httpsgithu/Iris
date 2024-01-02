@@ -194,6 +194,36 @@ const formatImages = function (data) {
 };
 
 /**
+ * Format an item into a context-ready item
+ * Typically a playlist, album or artist. We only need a few fields, but more than the simpleObject
+ *
+ * @param data obj
+ * @return obj
+ * */
+const formatContext = function (data) {
+  const context = {};
+  const fields = [
+    'uri',
+    'name',
+    'type',
+    'provider',
+    'context',
+    'can_edit',
+  ];
+
+  for (const field of fields) {
+    if (data.hasOwnProperty(field)) {
+      context[field] = data[field];
+    }
+  }
+
+  // Default our 'context' to object type
+  if (!data.context && context.type) context.context = context.type;
+
+  return context;
+};
+
+/**
  * Format a simple object
  * This is a shell record containing only the bare essentials. Typically
  * a tracks' artists/album
@@ -206,6 +236,7 @@ const formatSimpleObject = function (data) {
   const fields = [
     'uri',
     'name',
+    'type',
   ];
 
   for (const field of fields) {
@@ -255,6 +286,13 @@ const formatUsers = function (records = []) {
   const formatted = [];
   for (const record of records) {
 	    formatted.push(formatUser(record));
+  }
+  return formatted;
+};
+const formatPlaylistGroups = function (records = []) {
+  const formatted = [];
+  for (const record of records) {
+	    formatted.push(formatPlaylistGroup(record));
   }
   return formatted;
 };
@@ -315,6 +353,7 @@ const formatAlbum = function (data) {
   const album = { type: 'album' };
   const fields = [
     'uri',
+    'loading',
     'in_library',
     'provider',
     'name',
@@ -388,6 +427,7 @@ const formatArtist = function (data) {
   const artist = { type: 'artist' };
   const fields = [
     'uri',
+    'loading',
     'in_library',
     'provider',
     'mbid',
@@ -448,6 +488,7 @@ const formatPlaylist = function (data) {
   const playlist = { type: 'playlist' };
   const fields = [
     'uri',
+    'loading',
     'in_library',
     'snapshot_id',
     'provider',
@@ -497,8 +538,8 @@ const formatPlaylist = function (data) {
     playlist.followers = data.followers.total;
   }
 
-  if (data.tracks && data.tracks.total !== undefined) {
-    playlist.tracks_total = data.tracks.total;
+  if (data.tracks && data.tracks_total !== undefined) {
+    playlist.tracks_total = data.tracks_total;
   }
 
   if (playlist.last_modified && playlist.added_at === undefined) {
@@ -535,6 +576,7 @@ const formatUser = function (data) {
   const user = { type: 'user' };
   const fields = [
     'id',
+    'loading',
     'in_library',
     'uri',
     'provider',
@@ -589,10 +631,13 @@ const formatUser = function (data) {
 const formatTrack = function (data) {
   const track = { type: 'track' };
   const fields = [
-    'loading',
     'uri',
+    'loading',
     'in_library',
     'is_playable',
+    'is_loved',
+    'is_explicit',
+    'is_local',
     'tlid',
     'provider',
     'name',
@@ -604,11 +649,8 @@ const formatTrack = function (data) {
     'duration',
     'followers',
     'popularity',
-    'userloved',
     'last_modified',
     'added_at',
-    'is_explicit',
-    'is_local',
     'lyrics',
     'lyrics_path',
     'lyrics_results',
@@ -672,6 +714,10 @@ const formatTrack = function (data) {
     track.is_explicit = data.explicit;
   }
 
+  if (track.userloved === undefined && data.userloved !== undefined) {
+    track.is_loved = data.userloved === '1';
+  }
+
   // Copy images from albums (if applicable)
   // TOOD: Identify if we stil need this...
   if (data.album && data.album.images) {
@@ -699,7 +745,7 @@ const formatTrack = function (data) {
 
   // Remove lower-case encoding of ':'
   // See https://github.com/tkem/mopidy-dleyna/issues/72
-  track.uri = track.uri.replace('%3a', '%3A');
+  track.uri = track.uri?.replace('%3a', '%3A');
 
   return track;
 };
@@ -714,6 +760,7 @@ const formatClient = function (data) {
   const client = { type: 'client' };
   const fields = [
     'id',
+    'loading',
     'connected',
     'name',
     'host_name',
@@ -779,6 +826,7 @@ const formatCategory = function (data) {
   const fields = [
     'id',
     'uri',
+    'loading',
     'name',
     'playlists_uris',
   ];
@@ -800,6 +848,33 @@ const formatCategory = function (data) {
   return category;
 };
 
+const formatPlaylistGroup = function (data) {
+  const playlistGroup = { type: 'playlist_group' };
+  const fields = [
+    'id',
+    'uri',
+    'loading',
+    'name',
+    'playlists_uris',
+  ];
+
+  for (const field of fields) {
+    if (data.hasOwnProperty(field)) {
+      playlistGroup[field] = data[field];
+    }
+  }
+
+  if (data.id) {
+    playlistGroup.uri = `spotify:category:${data.id}`
+  }
+
+  if (data.icons) {
+    playlistGroup.images = formatImages(data.icons);
+  }
+
+  return playlistGroup;
+};
+
 /**
  * Format a snapcast client object into a universal format
  *
@@ -811,6 +886,7 @@ const formatGroup = function (data) {
   const fields = [
     'id',
     'name',
+    'loading',
     'mute',
     'stream_id',
     'clients_ids',
@@ -976,6 +1052,7 @@ export {
   getTrackIcon,
   digestMopidyImages,
   formatImages,
+  formatContext,
   formatSimpleObject,
   formatSimpleObjects,
   formatAlbum,
@@ -990,6 +1067,8 @@ export {
   formatTracks,
   formatClient,
   formatGroup,
+  formatPlaylistGroup,
+  formatPlaylistGroups,
   formatCategory,
   formatCategories,
   collate,
@@ -1004,6 +1083,7 @@ export default {
   getTrackIcon,
   digestMopidyImages,
   formatImages,
+  formatContext,
   formatSimpleObject,
   formatSimpleObjects,
   formatAlbum,
@@ -1018,6 +1098,8 @@ export default {
   formatTracks,
   formatClient,
   formatGroup,
+  formatPlaylistGroup,
+  formatPlaylistGroups,
   formatCategory,
   formatCategories,
   collate,

@@ -4,7 +4,8 @@ import MuteControl from './Fields/MuteControl';
 import LatencyControl from './Fields/LatencyControl';
 import TextField from './Fields/TextField';
 import SelectField from './Fields/SelectField';
-import { I18n, i18n } from '../locale';
+import { I18n } from '../locale';
+import Link from './Link';
 
 const SnapcastClients = ({
   actions, group, clients, groups,
@@ -60,7 +61,7 @@ const SnapcastClients = ({
                       {
                         key: `client_${client.id}_new_group`,
                         value: group.id,
-                        label: i18n('snapcast.new_group'),
+                        label: <I18n path="snapcast.new_group" />,
                       },
                     ]}
                     autosave
@@ -75,16 +76,19 @@ const SnapcastClients = ({
                   <LatencyControl
                     max="500"
                     value={client.latency}
-                    onChange={(value) => actions.setClientLatency(client.id, parseInt(value))}
-                  />
-                  <TextField
-                    className="tiny"
-                    type="number"
-                    onChange={(value) => actions.setClientLatency(client.id, parseInt(value))}
-                    value={String(client.latency)}
-                    autosave
+                    onChange={(value) => actions.setClientLatency(client.id, Number(value))}
                   />
                 </div>
+              </div>
+              <div>
+                <Link
+                  className="button button--destructive button--small"
+                  onClick={() => actions.deleteClient(client.id)}
+                  to="/settings/services/snapcast/"
+                  scrollTo="#services-menu"
+                >
+                  <I18n path="actions.delete" />
+                </Link>
               </div>
               <div className="snapcast__client__volume field field--condensed">
                 <VolumeControl

@@ -6,16 +6,12 @@ import SnapcastGroups from './SnapcastGroups';
 import * as uiActions from '../services/ui/actions';
 import * as actions from '../services/snapcast/actions';
 import { I18n } from '../locale';
-import Button from './Button';
 
 const Snapcast = (props) => {
   const {
     actions,
     show_disconnected_clients,
     uiActions,
-    match,
-    history,
-    config,
     snapcast: {
       host,
       port,
@@ -25,18 +21,6 @@ const Snapcast = (props) => {
       connected,
     },
   } = props;
-
-  const restoreDefaults = () => {
-    const {
-      snapcast_enabled = false,
-      snapcast_host = 'localhost',
-      snapcast_port = '1780',
-      snapcast_ssl = false,
-    } = config || {};
-
-    actions.setEnabled(snapcast_enabled);
-    actions.setConnection({ host: snapcast_host, port: snapcast_port, ssl: snapcast_ssl });
-  }
 
   return (
     <div className="snapcast">
@@ -60,18 +44,6 @@ const Snapcast = (props) => {
           <label>
             <input
               type="checkbox"
-              name="streaming_enabled"
-              checked={streaming_enabled}
-              disabled={!enabled}
-              onChange={() => actions.setStreamingEnabled(!streaming_enabled)}
-            />
-            <span className="label">
-              <I18n path="snapcast.streaming_enabled" />
-            </span>
-          </label>
-          <label>
-            <input
-              type="checkbox"
               name="show_disconnected_clients"
               checked={show_disconnected_clients}
               onChange={() => uiActions.set({ snapcast_show_disconnected_clients: !show_disconnected_clients })}
@@ -80,9 +52,6 @@ const Snapcast = (props) => {
               <I18n path="snapcast.show_disconnected_clients" />
             </span>
           </label>
-          <Button onClick={restoreDefaults} size="small" className="no-margin">
-            <I18n path="services.restore_defaults" />
-          </Button>
         </div>
       </div>
 
@@ -141,14 +110,13 @@ const Snapcast = (props) => {
         </div>
       </div>
 
-      {connected && enabled && <SnapcastGroups match={match} history={history} />}
+      {connected && enabled && <SnapcastGroups />}
     </div>
   );
 };
 
 const mapStateToProps = (state) => ({
   snapcast: state.snapcast,
-  config: state.pusher.config,
   show_disconnected_clients: (
     state.ui.snapcast_show_disconnected_clients !== undefined
       ? state.ui.snapcast_show_disconnected_clients

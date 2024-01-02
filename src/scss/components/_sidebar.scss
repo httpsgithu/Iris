@@ -29,7 +29,7 @@
     line-height: 1em;
 
     &__item {
-      font-family: "Overpass";
+      font-family: $font-family-alt;
       font-weight: 600;
       font-size: 1.05rem;
       color: colour('white');
@@ -147,14 +147,15 @@
   }
 
   .close {
+    @include click_feedback();
     display: none;
     position: absolute;
     bottom: 4px;
     right: 4px;
-    padding: 10px 8px;
+    padding: 10px;
     display: inline-block;
-    opacity: 0.5;
     z-index: 99;
+    font-size: 1.2rem;
 
     @include theme('light') {
       color: colour('darkest_grey');

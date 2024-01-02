@@ -55,7 +55,7 @@ const setFavicon = function (filename) {
     const new_link = document.createElement('link');
     new_link.className = link.className;
     new_link.rel = link.rel;
-    new_link.href = `/iris/assets/${filename}`;
+    new_link.href = `assets/${filename}`;
     if (link.type) {
       new_link.type = link.type;
     }
@@ -216,12 +216,13 @@ const sourceIcon = function (uri, source = null) {
     case 'soundcloud':
     case 'lastfm':
     case 'tidal':
+    case 'jellyfin':
       return source;
 
     case 'youtube':
     case 'yt':
     case 'ytmusic':
-      return 'youtube';
+      return 'play-circle';
 
     default:
       return 'cloud';
@@ -602,6 +603,8 @@ const upgradeSpotifyPlaylistUri = function (uri) {
   return upgradeSpotifyPlaylistUris([uri])[0];
 };
 
+const getSearchResultKey = ({ provider, type, term }) => [provider, type, term].join(':');
+
 export {
   debounce,
   throttle,
@@ -625,6 +628,7 @@ export {
   upgradeSpotifyPlaylistUris,
   upgradeSpotifyPlaylistUri,
   iconFromKeyword,
+  getSearchResultKey,
 };
 
 export default {
@@ -650,4 +654,5 @@ export default {
   upgradeSpotifyPlaylistUris,
   upgradeSpotifyPlaylistUri,
   iconFromKeyword,
+  getSearchResultKey,
 };

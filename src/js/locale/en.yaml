@@ -58,6 +58,11 @@ common:
   filter: Filter
   by: ' by '
   loading_library: 'Loading %{provider} %{type}'
+  play_state:
+    playing: Playing
+    paused: Paused
+    stopped: Stopped
+    idle: Idle
 fields:
   start_typing: 'Start typing...'
   search: 'Search...'
@@ -133,6 +138,7 @@ services:
     searching: 'Searching %{provider} %{type}'
     searching_providers: 'Searching %{count} Mopidy providers'
     loading_albums: 'Loading %{count} local albums'
+    loading_artwork: 'Loading artwork'
   spotify:
     title: Spotify
   pusher:
@@ -153,6 +159,8 @@ services:
     title: YouTube
   tidal:
     title: Tidal
+  jellyfin:
+    title: Jellyfin
 
 ##
 # Components
@@ -161,7 +169,7 @@ sidebar:
   now_playing: Now playing
   search: Search
   discover: Discover
-  genre: Genre / Mood
+  moods: Genre / Mood
   featured_playlists: Featured playlists
   new_releases: New releases
   my_music: My music
@@ -189,13 +197,12 @@ context_menu:
   unpin: Unpin
   go_to_artist: Go to artist
   go_to_user: Go to user
+  go_to_track: Go to track
   track_info: Track info
   discover_similar: Discover similar
   start_radio: Start radio
   copy_uri: Copy URI(s)
   refresh: Refresh
-dropzones:
-  dragging_things: 'Dragging %{count} things'
 playback_controls:
   consume: Consume
   shuffle: Shuffle
@@ -206,6 +213,7 @@ playback_controls:
 snapcast:
   enabled: Enabled
   streaming_enabled: Streaming enabled
+  stream_on_this_device: Stream on this device
   show_disconnected_clients: Show disconnected clients
   no_connected_clients: No connected clients
   host: Host
@@ -217,6 +225,7 @@ snapcast:
   latency: Latency
   stream: Stream
   volume: Volume
+  not_controllable: Not controllable
   encryption:
     label: Encryption
     sublabel: Use SSL
@@ -328,8 +337,9 @@ search:
   title_window: 'Search: %{term}'
   context_actions:
     sort: Sort
-    source: 'Sources (%{count})'
+    source: Sources
   placeholder: Search
+  no_results: No results
   all:
     title: All
   artists:
@@ -386,9 +396,6 @@ settings:
       wide: Wide scrollbars
       hidden: Hidden scrollbars
       smooth_scrolling: Smooth scroll
-    sources_priority:
-      label: Sources priority
-      description: Drag-and-drop to prioritize search providers and results
     reporting:
       label: Reporting
       sublabel: Allow reporting of anonymous usage statistics
@@ -416,14 +423,17 @@ settings:
       upgrade_available: 'Upgrade available (%{version})'
       upgrade: 'Upgrade to %{version}'
       up_to_date: Up to date
-    share_configuration: Share configuration
+    shared_configuration:
+      label: Share configuration
+      share: Export/share
+      import: Import from server
     restart: Restart server
     reset: Reset settings
   about:
     title: About
     blurb_1: ' is an open-source project by '
     blurb_2: '. It is provided free and with absolutely no warranty. If you paid someone for this software, please let me know.'
-    donate: Donate
+    sponsor: Become a sponsor
     github: GitHub
   pusher_connection_list:
     not_connected: Not connected
@@ -474,12 +484,9 @@ user:
   you: You
 discover:
   title: Discover
-  categories:
+  moods:
     title: 'Genre / Mood'
-  category:
-    title: 'Genre / Mood'
-    category: Category
-  featured:
+  featured_playlists:
     title: Featured playlists
   new_releases:
     title: New releases
@@ -508,7 +515,7 @@ library:
 modal:
   add_to_playlist:
     title: Add to playlist
-    subtitle: 'Select playlist to add %{count} track%{plural} to'
+    subtitle: 'Select playlist to add %{count} item%{plural} to'
     no_playlists: No playlists available
     no_editable_playlists: No editable playlists
   add_to_queue:
@@ -523,7 +530,7 @@ modal:
   edit_playlist:
     title: Edit playlist
     title_create: Create playlist
-    subtitle: 'And add %{count} track%{plural}'
+    subtitle: 'And add %{count} item%{plural}'
     name_required: Name is required
     name: Name
     description: Description
@@ -564,23 +571,46 @@ modal:
     title: Now playing
     title_window: '%{name} by %{artist} (now playing)'
     lyrics: Lyrics
-  share_configuration:
-    title: Share configuration
-    subtitle: Push your authorizations and interface settings to another, connected user
+  import_configuration:
+    title: Import configuration
+    configurations: Configurations to import
+    import_now: Import now
+  shared_config:
     no_peers: No peer connections
     recipients: Recipients
     configurations: Configurations
-    authorization: '%{service} authorization'
-    logged_in_as: 'Logged in as %{name}'
-    snapcast_description: Server connection details
-    interface: Interface settings
-    interface_description: Theme, sorting, filters, etc
-    import:
-      title: Configuration shared
-      subtitle: 'Another user has shared their configuration with you. This includes:'
-      do_you_want_to_import: Do you want to import this?
-      import_now: Import now
-      successful: Import successful
+    import_now: Import now
+    imported: Import successful
+    share: Share now
+    shared: Share successful
+    push:
+      title: Share configuration
+      subtitle: Push your authorizations and interface settings to another, connected user
+    pushed:
+      title: Configuration received
+      subtitle: Another user has shared their configuration with you
+    server:
+      title: Import configuration
+      subtitle: Import third-party authorizations and other settings
+      label: Server
+      description: Save to server for any user to import
+    config:
+      label: Configurations
+      ui:
+        label: User interface
+        description: Theme, sorting, filters, etc
+      spotify:
+        label: Spotify authorisation
+        description: 'Logged in as %{name}'
+      lastfm:
+        label: LastFM authorisation
+        description: 'Logged in as %{name}'
+      genius:
+        label: Genius authorisation
+        description: 'Logged in as %{name}'
+      snapcast:
+        label: Snapcast
+        description: Server connection details
   reset:
     title: Reset Iris
     subtitle: Clear your local configuration, storage information or cache
@@ -604,6 +634,9 @@ modal:
     title: Hotkeys
     keys:
       info: Hotkeys info (this dialog)
+      now_playing: Now playing
+      search: Search
+      kiosk_mode: Kiosk mode
       exit: Cancel the current interaction
       play_pause: Play/pause
       stop: Stop

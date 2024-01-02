@@ -1,36 +1,20 @@
-import React, { useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import React from 'react';
 import URILink from './URILink';
-import { I18n, i18n } from '../locale';
+import { I18n } from '../locale';
 import {
   getFromUri,
   titleCase,
   uriType,
 } from '../util/helpers';
-import {
-  makeItemSelector,
-  makeLoadingSelector,
-} from '../util/selectors';
-import { loadUri } from '../services/core/actions';
 
 export default ({
   by,
-  uri,
+  from,
   className = '',
   inline,
 }) => {
-  if (!uri) return null;
-
-  const dispatch = useDispatch();
-  const from = useSelector(makeItemSelector(uri));
-  const loading = useSelector(makeLoadingSelector([`(.*)${uri}(.*)`]));
-
-  useEffect(() => {
-    if (uri && !from && !loading) {
-      dispatch(loadUri(uri));
-    }
-  }, []);
-
+  if (!from) return null;
+  const { uri, name } = from;
   const type = from?.type || uriType(uri);
   let link = null;
   switch (type) {
@@ -43,8 +27,12 @@ export default ({
       break;
 
     case 'browse':
+      let directory = '';
+      if (uri.indexOf('file://') > -1) {
+        directory = decodeURIComponent(uri.substr(uri.lastIndexOf('/'), uri.length));
+      }
       link = (
-        <URILink type={from?.type} uri={uri}>
+        <URILink type={type} uri={uri} suffix={directory}>
           <I18n path="library.browse.title" />
         </URILink>
       );
@@ -52,7 +40,7 @@ export default ({
 
     case 'search':
       link = (
-        <URILink type={from?.type} uri={uri}>
+        <URILink type={type} uri={uri}>
           <I18n path="search.title" />
         </URILink>
       );
@@ -67,13 +55,13 @@ export default ({
       break;
 
     default:
-      link = <URILink type={type} uri={uri}>{from?.name || titleCase(type)}</URILink>;
+      link = <URILink type={type} uri={uri}>{name || titleCase(type)}</URILink>;
   }
 
   if (inline) {
     return (
       <div className={className}>
-        {i18n('specs.added_from')}
+        <I18n path="specs.added_from" />
         {link}
       </div>
     );
@@ -83,7 +71,7 @@ export default ({
     <div className={`${className} tooltip`}>
       {link}
       <span className="tooltip__content">
-        {i18n('specs.added_by', { by })}
+      <I18n path="specs.added_by" params={{ by }} />
       </span>
     </div>
   );

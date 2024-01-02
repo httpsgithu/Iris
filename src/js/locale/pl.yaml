@@ -173,8 +173,6 @@ context_menu:
   discover_similar: Odkryj podobne
   start_radio: Włącz radio
   copy_uri: Kopiuj URI
-dropzones:
-  dragging_things: 'Przeciąganie %{count} obiektów'
 playback_controls:
   consume: Konsumuj
   shuffle: Losuj
@@ -333,9 +331,6 @@ settings:
       touch_events: Włącz obsługę zdarzeń dotykowych
       touch_events_tooltip: Umożliwia zmienianie utworów poprzez przesunięcia palcem po ekranie
       wide_scrollbars: Używaj szerokich pasków przewijania
-    sources_priority:
-      label: Priorytety źródeł
-      description: Przesuń i upuść aby zmienić priorytety dostawców
     reporting:
       label: Raportowanie
       sublabel: Włącz anonimowe raportowanie statystyk

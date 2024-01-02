@@ -51,9 +51,6 @@ export default function reducer(ui = {}, action) {
     case 'INSTALL_PROMPT':
       return { ...ui, install_prompt: action.event };
 
-      /**
-         * Context menu
-         * */
     case 'SHOW_CONTEXT_MENU':
       return { ...ui, context_menu: action.data };
 
@@ -72,43 +69,12 @@ export default function reducer(ui = {}, action) {
     case 'REMOVE_TOUCH_CONTEXT_MENU':
       return { ...ui, touch_context_menu: null };
 
-      /**
-         * Dragging
-         * */
-    case 'DRAG_START':
-      return {
-        ...ui,
-        dragger: {
-          dragging: true,
-          active: false,
-          context: action.context,
-          from_uri: action.from_uri,
-          victims: action.victims,
-          victims_indexes: action.victims_indexes,
-          start_x: action.start_x,
-          start_y: action.start_y,
-        },
-      };
-
-    case 'DRAG_ACTIVE':
-      var dragger = { ...ui.dragger, active: true };
-      return { ...ui, dragger };
-
-    case 'DRAG_END':
-      return { ...ui, dragger: false };
-
-      /**
-         * Modals
-         * */
     case 'OPEN_MODAL':
-      return { ...ui, modal: action.modal };
+      return { ...ui, modal: action.modal_state };
 
     case 'CLOSE_MODAL':
-      return { ...ui, modal: false };
+      return { ...ui, modal: null };
 
-      /**
-         * Notifications
-         * */
     case 'CREATE_NOTIFICATION':
       var notifications = { ...ui.notifications };
       notifications[action.notification.key] = action.notification;
@@ -126,14 +92,15 @@ export default function reducer(ui = {}, action) {
       delete notifications[action.key];
       return { ...ui, notifications };
 
-      /**
-         * Loading and processes
-         * */
-
-    case 'START_LOADING':
-      var load_queue = { ...(ui.load_queue ? ui.load_queue : {}) };
-      load_queue[action.key] = action.source || action.key;
-      return { ...ui, load_queue };
+    case 'START_LOADING': {
+      return {
+        ...ui,
+        load_queue: {
+          ...ui.load_queue || {},
+          [action.key]: action.source || action.key,
+        },
+      };
+    }
 
     case 'STOP_LOADING':
       return {

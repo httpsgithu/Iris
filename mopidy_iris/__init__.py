@@ -3,7 +3,7 @@ import pathlib
 
 from mopidy import config, ext
 
-__version__ = "3.60.1"
+__version__ = "3.69.3"
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ class Extension(ext.Extension):
         schema["enabled"] = config.Boolean()
         schema["country"] = config.String()
         schema["locale"] = config.String()
+        schema["verify_certificates"] = config.Boolean()
         schema["snapcast_enabled"] = config.Boolean()
         schema["snapcast_host"] = config.String()
         schema["snapcast_port"] = config.String()

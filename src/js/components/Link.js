@@ -1,12 +1,11 @@
 import React from 'react';
-import { Link as RouterLink, useHistory, useLocation } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { scrollTo } from '../util/helpers';
-import { decodeUri } from '../util/format';
 
 const updateScrollPosition = ({
   retainScroll = false,
   scrollTarget = 0,
-  history,
+  navigate,
   location: {
     state,
     pathname,
@@ -17,14 +16,17 @@ const updateScrollPosition = ({
   // This doesn't trigger lazy-load elements (unless scrolling exposes the LazyLoader component).
   const main = document.getElementById('main');
 
-  history.replace(
+  navigate(
     pathname,
     {
-      ...state,
-      scroll_position: main.scrollTop,
-      previous: {
-        pathname,
+      state: {
+        ...state,
+        scroll_position: main.scrollTop,
+        previous: {
+          pathname,
+        },
       },
+      replace: true,
     },
   );
 
@@ -41,6 +43,7 @@ const Link = ({
   retainScroll,
   scrollTo: scrollTarget,
   onContextMenu,
+  onClick,
   className = '',
   activeClassName,
   to,
@@ -48,23 +51,26 @@ const Link = ({
   children,
 }) => {
   if (!to) return <span className={className}>{children}</span>;
-  const history = useHistory();
+  const navigate = useNavigate();
   const location = useLocation();
-  const onClick = () => updateScrollPosition({
-    history, location, retainScroll, scrollTarget,
-  });
+  const handleClick = (e) => {
+    updateScrollPosition({
+      navigate, location, retainScroll, scrollTarget,
+    });
+    if (onClick) onClick(e);
+  }
 
   // Decode both links. This handles issues where one link is encoded and the other isn't, but
   // they're otherwise identical
-  const currentLink = history?.location?.pathname || '';
+  const currentLink = location?.pathname || '';
   const isLinkActive = exact ? currentLink === to : currentLink.startsWith(to);
 
   // We have an active detector method
   // This is used almost solely by the Sidebar navigation
-  const active = history && isLinkActive ? (activeClassName || 'active') : '';
+  const active = navigate && isLinkActive ? (activeClassName || 'active') : '';
   return (
     <RouterLink
-      onClick={onClick}
+      onClick={handleClick}
       onContextMenu={onContextMenu}
       className={`${className} ${active}`}
       to={to}

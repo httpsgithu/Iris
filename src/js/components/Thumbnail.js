@@ -1,9 +1,13 @@
 import React, { memo } from 'react';
 import Link from './Link';
 import Icon from './Icon';
+import Loader from './Loader';
 
 export default memo((props) => {
-  const { placeholder = true } = props;
+  const {
+    placeholder = true,
+    loading,
+  } = props;
   const mapImageSizes = () => {
     // Single image
     if (props.image) {
@@ -36,6 +40,7 @@ export default memo((props) => {
 
   const image = mapImageSizes();
   let class_name = 'thumbnail thumbnail--loaded';
+  if (loading) class_name += ' thumbnail--loading';
   if (props.fill) class_name += ' thumbnail--fill';
   if (props.size) class_name += ` thumbnail--${props.size}`;
   if (props.circle) class_name += ' thumbnail--circle';
@@ -79,11 +84,12 @@ export default memo((props) => {
           style={{ backgroundImage: `url("${image}")` }}
         />
       )}
+      {loading && <Loader loading />}
       <div className="thumbnail__actions">
         {props.canZoom && image && (
           <Link
             className="thumbnail__actions__item thumbnail__actions__item--zoom"
-            to={`/image-zoom?url=${image}`}
+            to={`/modal/image-zoom?url=${image}`}
           >
             <Icon name="search" />
           </Link>

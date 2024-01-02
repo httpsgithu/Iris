@@ -38,6 +38,7 @@ let initialState = {
     tracks: {},
     items: {},
     libraries: {},
+    search_results: {},
   },
   ui: {
     language: 'en',
@@ -60,7 +61,7 @@ let initialState = {
   mopidy: {
     connected: false,
     host: window.location.hostname,
-    port: (window.location.port ? window.location.port : (window.location.protocol === 'https:' ? '443' : '80')),
+    port: window.location.port || (window.location.protocol === 'https:' ? '443' : '80'),
     ssl: window.location.protocol === 'https:',
     current_server: 'default',
     servers: {
@@ -68,7 +69,7 @@ let initialState = {
         id: 'default',
         name: 'Default',
         host: window.location.hostname,
-        port: (window.location.port ? window.location.port : (window.location.protocol === 'https:' ? '443' : '80')),
+        port: window.location.port || (window.location.protocol === 'https:' ? '443' : '80'),
         ssl: window.location.protocol === 'https:',
       },
     },
@@ -197,7 +198,6 @@ const uiPersistConfig = {
     'processes',
     'context_menu',
     'current_track_transition',
-    'dragger',
     'selected_tracks',
     'sidebar_open',
     'window_focus',
@@ -231,9 +231,16 @@ const rootReducer = (state, action) => {
   return appReducer(nextState, action);
 };
 
-const store = createStore(
+const buildStore = (
+  {
+    initialState: customInitialState = {},
+  } = {},
+) => createStore(
   rootReducer,
-  initialState,
+  {
+    ...initialState,
+    ...customInitialState,
+  },
   applyMiddleware(
     thunk,
     coreMiddleware,
@@ -246,7 +253,9 @@ const store = createStore(
     snapcastMiddleware,
   ),
 );
+
+const store = buildStore();
 const persistor = persistStore(store);
 
-export default { store, persistor };
-export { store, persistor };
+export default { buildStore, store, persistor };
+export { buildStore, store, persistor, initialState };

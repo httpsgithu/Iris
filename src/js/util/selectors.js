@@ -1,6 +1,6 @@
 import { createSelector } from 'reselect';
 import { indexToArray } from './arrays';
-import { isLoading } from './helpers';
+import { getSearchResultKey, isLoading } from './helpers';
 import { i18n } from '../locale';
 
 const getItem = (state, uri) => state.core.items[uri];
@@ -11,7 +11,8 @@ const getLibrary = (state, uri) => state.core.libraries[uri];
 const getLibraries = (state) => state.core.libraries;
 const getSearchResults = (state) => state.core.search_results;
 const getGridGlowEnabled = (state) => state.ui.grid_glow_enabled;
-const getDragger = (state) => state.ui.dragger;
+const getSorts = (state) => state.ui.sort;
+const getMopidySettings = (state) => state.mopidy;
 
 const makeItemSelector = (uri) => createSelector(
   [getItems],
@@ -67,13 +68,14 @@ const makeLibrarySelector = (name, filtered = true) => createSelector(
   },
 );
 
-const makeSearchResultsSelector = (term, type) => createSelector(
+const makeSearchResultsSelector = (providers, term, type) => createSelector(
   [getSearchResults],
-  (searchResults) => {
-    if (!searchResults || searchResults.query.term !== term) return [];
-    return searchResults[type] || [];
-  },
-);
+  (searchResults) => providers.reduce(
+    (acc, curr) => [
+      ...acc,
+      ...searchResults[getSearchResultKey({ provider: curr, term, type })] || [],
+    ], []),
+  );
 
 const makeProcessProgressSelector = (keys) => createSelector(
   [getProcesses],
@@ -115,11 +117,21 @@ const providers = {
       uri: 'tidal:my_playlists',
       title: i18n('services.tidal.title'),
     },
+    {
+      scheme: 'jellyfin:',
+      uri: 'jellyfin:playlists',
+      title: i18n('services.jellyfin.title'),
+    },
+    {
+      scheme: 'ytmusic:',
+      uri: 'ytmusic:playlists',
+      title: i18n('services.youtube.title'),
+    },
   ],
   albums: [
     {
       scheme: 'local:',
-      uri: 'local:directory?type=album',
+      setting_name: 'library_albums_uri',
       title: i18n('services.mopidy.local'),
     },
     {
@@ -142,11 +154,16 @@ const providers = {
       uri: 'ytmusic:album',
       title: i18n('services.youtube.title'),
     },
+    {
+      scheme: 'jellyfin:',
+      uri: 'jellyfin:albums',
+      title: i18n('services.jellyfin.title'),
+    },
   ],
   artists: [
     {
       scheme: 'local:',
-      uri: 'local:directory?type=artist&role=albumartist',
+      setting_name: 'library_artists_uri',
       title: i18n('services.mopidy.local'),
     },
     {
@@ -169,11 +186,16 @@ const providers = {
       uri: 'ytmusic:artist',
       title: i18n('services.youtube.title'),
     },
+    {
+      scheme: 'jellyfin:',
+      uri: 'jellyfin:artists',
+      title: i18n('services.jellyfin.title'),
+    },
   ],
   tracks: [
     {
       scheme: 'local:',
-      uri: 'local:directory?type=track',
+      setting_name: 'library_tracks_uri',
       title: i18n('services.mopidy.local'),
     },
     {
@@ -181,17 +203,71 @@ const providers = {
       uri: 'spotify:library:tracks',
       title: i18n('services.spotify.title'),
     },
+    {
+      scheme: 'tidal:',
+      uri: 'tidal:my_tracks',
+      title: i18n('services.tidal.title'),
+    },
+  ],
+  moods: [
+    {
+      scheme: 'spotify:',
+      uri: 'spotify:categories',
+      title: i18n('services.spotify.title'),
+    },
+    {
+      scheme: 'tidal:',
+      uri: 'tidal:moods',
+      title: i18n('services.tidal.title'),
+    },
+    {
+      scheme: 'tidal:',
+      uri: 'tidal:genres',
+      title: i18n('services.tidal.title'),
+    },
+    {
+      scheme: 'ytmusic:',
+      uri: 'ytmusic:mood',
+      title: i18n('services.youtube.title'),
+    },
+  ],
+  featured_playlists: [
+    {
+      scheme: 'spotify:',
+      uri: 'spotify:featured',
+      title: i18n('services.spotify.title'),
+    },
+    {
+      scheme: 'ytmusic:',
+      uri: 'ytmusic:auto',
+      title: i18n('services.youtube.title'),
+    },
   ],
 };
 const getProvider = (type, scheme) => providers[type]?.find((p) => p.scheme === scheme);
 const getUriSchemes = (state) => state.mopidy.uri_schemes || [];
+const applyUriSettingToProviders = (filteredProviders, mopidySettings) => filteredProviders.map(
+  ({ setting_name, ...rest }) => ({
+    uri: setting_name ? mopidySettings[setting_name] : undefined,
+    ...rest,
+  }),
+);
 const makeProvidersSelector = (context) => createSelector(
-  [getUriSchemes],
-  (schemes) => {
+  [getUriSchemes, getMopidySettings],
+  (schemes, mopidySettings) => {
     if (!providers[context]) return [];
-    return providers[context].filter((p) => schemes.indexOf(p.scheme) > -1);
+    const results = providers[context].filter((p) => schemes.indexOf(p.scheme) > -1);
+    return applyUriSettingToProviders(results, mopidySettings);
   },
 );
+const makeSortSelector = (key, defaultField = 'sort_id') => createSelector(
+  [getSorts],
+  (sorts) => [
+    sorts[key]?.field || defaultField,
+    sorts[key]?.reverse || false,
+  ],
+);
+
 const getSortSelector = (state, key, defaultField = 'sort_id') => {
   const result = state.ui.sort[key];
   return [
@@ -205,7 +281,6 @@ export {
   getLibrary,
   getGridGlowEnabled,
   getLibrarySource,
-  getDragger,
   makeItemSelector,
   makeArtistSelector,
   makeLibrarySelector,
@@ -215,5 +290,6 @@ export {
   queueHistorySelector,
   makeProvidersSelector,
   getProvider,
+  makeSortSelector,
   getSortSelector,
 };

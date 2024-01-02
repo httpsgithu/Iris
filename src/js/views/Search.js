@@ -1,318 +1,129 @@
-import React from 'react';
-import { connect } from 'react-redux';
-import { bindActionCreators } from 'redux';
-import { Switch, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import Header from '../components/Header';
 import Icon from '../components/Icon';
 import DropdownField from '../components/Fields/DropdownField';
 import SearchForm from '../components/Fields/SearchForm';
-import SearchResults from '../components/SearchResults';
-import * as coreActions from '../services/core/actions';
-import * as uiActions from '../services/ui/actions';
-import * as mopidyActions from '../services/mopidy/actions';
-import * as spotifyActions from '../services/spotify/actions';
-import { titleCase } from '../util/helpers';
+import { AllSearchResults, SearchResults } from '../components/SearchResults';
+import { startSearch } from '../services/core/actions';
+import {
+  setSort,
+  hideContextMenu,
+  setWindowTitle,
+} from '../services/ui/actions';
 import { i18n } from '../locale';
+import { getSortSelector } from '../util/selectors';
+import useSearchQuery from '../util/useSearchQuery';
 
-class Search extends React.Component {
-  constructor(props) {
-    super(props);
+const SORT_KEY = 'search_results';
 
-    this.state = {
-      type: props.type || 'all',
-      term: props.term || '',
-    };
-  }
+const Search = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const {
+    term,
+    type,
+    providers,
+    allProviders,
+    providersString,
+  } = useSearchQuery();
+  const [sortField, sortReverse] = useSelector(
+    (state) => getSortSelector(state, SORT_KEY, 'name'),
+  );
 
-  componentDidMount = () => {
-    const {
-      uiActions: {
-        setWindowTitle,
-      },
-    } = this.props;
+  useEffect(() => {
+    dispatch(setWindowTitle('Search'));
+    $(document).find('.search-form input').trigger('focus');
+  }, []);
 
-    setWindowTitle('Search');
-
-    // Auto-focus on the input field
-    $(document).find('.search-form input').focus();
-    this.digestUri();
-  }
-
-  componentDidUpdate = ({
-    type: prevType,
-    term: prevTerm,
-  }) => {
-    const {
-      type: typeProp,
-      term: termProp,
-    } = this.props;
-    const { type, term } = this.state;
-
-    if (prevType !== typeProp || prevTerm !== termProp) {
-      this.search(type, term);
+  useEffect(() => {
+    if (term) {
+      dispatch(setWindowTitle(i18n('search.title_window', { term: decodeURIComponent(term) })));
+      dispatch(startSearch({ term, type, providers }));
     }
+  }, [providersString, type, term])
+
+  const onSubmit = (term) => {
+    updateSearchQuery(term, providers);
   }
 
-  onSubmit = (term) => {
-    const { type } = this.state;
-    const { history } = this.props;
+  const updateSearchQuery = (term, providers) => {
     const encodedTerm = encodeURIComponent(term);
-
-    this.setState(
-      { term },
-      () => {
-        history.push(`/search/${type}/${encodedTerm}`);
-      },
-    );
+    navigate(`/search/${type}/${providers.join(',') || 'none'}/${encodedTerm || ''}`);
   }
 
-  onReset = () => {
-    const { history } = this.props;
-    history.push('/search');
+  const onReset = () => navigate('/search');
+
+  const onProvidersChange = (providers) => {
+    updateSearchQuery(term, providers)
+    dispatch(hideContextMenu());
   }
 
-  onSortChange = (value) => {
-    const { uiActions: { hideContextMenu } } = this.props;
-    this.setSort(value);
-    hideContextMenu();
-  }
-
-  onSourceChange = (value) => {
-    const {
-      uiActions: {
-        set,
-        hideContextMenu,
-      },
-    } = this.props;
-    set({ uri_schemes_search_enabled: value });
-    hideContextMenu();
-  }
-
-  onSourceClose = () => {
-    this.search(true);
-  };
-
-  digestUri = () => {
-    const {
-      type,
-      term,
-    } = this.props;
-
-    if (type && term) {
-      this.setState({ type, term }, () => {
-        this.search();
-      });
-    } else if (!term || term === '') {
-      this.clearSearch();
-    }
-  }
-
-  clearSearch = () => {
-    const {
-      uiActions: {
-        setWindowTitle,
-      },
-    } = this.props;
-
-    setWindowTitle(i18n('search.title'));
-    this.setState({ term: '' });
-  }
-
-  search = (force = false) => {
-    const {
-      coreActions: {
-        startSearch,
-      },
-      uiActions: {
-        setWindowTitle,
-      },
-      search_results_query: {
-        type: existingType,
-        term: existingTerm,
-      },
-    } = this.props;
-    const {
-      type,
-      term,
-    } = this.state;
-
-    setWindowTitle(i18n('search.title_window', { term: decodeURIComponent(term) }));
-
-    if ((type && term && (force || existingType !== type || existingTerm !== term))) {
-      startSearch({ type, term });
-    }
-  }
-
-  setSort = (value) => {
-    const {
-      sort,
-      sort_reverse,
-      uiActions: {
-        set,
-      },
-    } = this.props;
-
+  const onSortChange = (value) => {
     let reverse = false;
-    if (sort === value) reverse = !sort_reverse;
-
-    const data = {
-      search_results_sort_reverse: reverse,
-      search_results_sort: value,
-    };
-    set(data);
+    if (value !== null && sortField === value) {
+      reverse = !sortReverse;
+    }
+    dispatch(setSort(SORT_KEY, value, reverse));
+    dispatch(hideContextMenu());
   }
 
-  render = () => {
-    const {
-      term,
-      type,
-    } = this.state;
-    const {
-      uri_schemes,
-      sort,
-      sort_reverse,
-      history,
-      uri_schemes_search_enabled,
-      uiActions,
-    } = this.props;
+  const sortOptions = [
+    { value: 'name', label: i18n('common.name') },
+    { value: 'uri', label: i18n('fields.filters.source') },
+    { value: 'followers', label: i18n('common.popularity') },
+    { value: 'artist', label: i18n('common.artist') },
+    { value: 'duration', label: i18n('common.duration') },
+  ];
 
-    const sort_options = [
-      { value: 'followers', label: i18n('common.popularity') },
-      { value: 'name', label: i18n('common.name') },
-      { value: 'artist', label: i18n('common.artist') },
-      { value: 'duration', label: i18n('common.duration') },
-      { value: 'uri', label: i18n('common.source') },
-    ];
+  const providerOptions = allProviders.map((value) => ({ value, label: value}))
 
-    const provider_options = uri_schemes.map((item) => ({
-      value: item,
-      label: titleCase(item.replace(':', '').replace('+', ' ')),
-    }));
+  const options = (
+    <>
+      <DropdownField
+        icon="swap_vert"
+        name={i18n('common.sort')}
+        value={sortField}
+        options={sortOptions}
+        selected_icon={sortField ? (sortReverse ? 'keyboard_arrow_up' : 'keyboard_arrow_down') : null}
+        handleChange={onSortChange}
+        valueAsLabel
+      />
+      <DropdownField
+        icon="cloud"
+        name={i18n('search.context_actions.source')}
+        value={providers}
+        options={providerOptions}
+        handleChange={onProvidersChange}
+      />
+    </>
+  );
 
-    const options = (
-      <>
-        <DropdownField
-          icon="swap_vert"
-          name={i18n('common.sort')}
-          value={sort}
-          valueAsLabel
-          options={sort_options}
-          selected_icon={sort_reverse ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
-          handleChange={this.onSortChange}
-        />
-        <DropdownField
-          icon="cloud"
-          name={i18n('common.sources')}
-          value={uri_schemes_search_enabled}
-          options={provider_options}
-          handleChange={this.onSourceChange}
-          onClose={this.onSourceClose}
-        />
-      </>
-    );
+  return (
+    <div className="view search-view">
+      <Header options={options}>
+        <Icon name="search" type="material" />
+      </Header>
 
-    return (
-      <div className="view search-view">
-        <Header options={options} uiActions={uiActions}>
-          <Icon name="search" type="material" />
-        </Header>
+      <SearchForm
+        key={`search_form_${type}_${term}`}
+        term={term}
+        onSubmit={onSubmit}
+        onReset={onReset}
+      />
 
-        <SearchForm
-          key={`search_form_${type}_${term}`}
-          history={history}
-          term={term}
-          onSubmit={this.onSubmit}
-          onReset={this.onReset}
-        />
-
+      {term && (
         <div className="content-wrapper">
-          <Switch>
-
-            <Route path="/search/artists/:term">
-              <SearchResults type="artists" query={{ term, type }} />
-            </Route>
-
-            <Route path="/search/albums/:term">
-              <SearchResults type="albums" query={{ term, type }} />
-            </Route>
-
-            <Route path="/search/playlists/:term">
-              <SearchResults type="playlists" query={{ term, type }} />
-            </Route>
-
-            <Route path="/search/tracks/:term">
-              <SearchResults type="tracks" query={{ term, type }} />
-            </Route>
-
-            <Route path="/search">
-              <div className="search-result-sections cf">
-                <section className="search-result-sections__item">
-                  <div className="inner">
-                    <SearchResults type="artists" query={{ term, type }} all />
-                  </div>
-                </section>
-                <section className="search-result-sections__item">
-                  <div className="inner">
-                    <SearchResults type="albums" query={{ term, type }} all />
-                  </div>
-                </section>
-                <section className="search-result-sections__item">
-                  <div className="inner">
-                    <SearchResults type="playlists" query={{ term, type }} all />
-                  </div>
-                </section>
-              </div>
-              <SearchResults type="tracks" query={{ term, type }} all />
-            </Route>
-
-          </Switch>
+          {type != 'all' ? (
+            <SearchResults type={type} />
+          ) : (
+            <AllSearchResults />
+          )}
         </div>
-      </div>
-    );
-  }
+      )}
+    </div>
+  );
 }
 
-const mapStateToProps = (state, ownProps) => {
-  const {
-    match: {
-      params: {
-        type,
-        term,
-      },
-    },
-  } = ownProps;
-  const {
-    mopidy: {
-      uri_schemes = [],
-    },
-    ui: {
-      uri_schemes_search_enabled = [],
-      search_results_sort: sort = 'followers.total',
-      search_results_sort_reverse,
-    },
-    core: {
-      search_results: {
-        query: search_results_query = {},
-      } = {},
-    },
-  } = state;
-
-  return {
-    type,
-    term,
-    uri_schemes,
-    uri_schemes_search_enabled,
-    sort,
-    sort_reverse: !!search_results_sort_reverse,
-    search_results_query,
-  };
-};
-
-const mapDispatchToProps = (dispatch) => ({
-  coreActions: bindActionCreators(coreActions, dispatch),
-  uiActions: bindActionCreators(uiActions, dispatch),
-  mopidyActions: bindActionCreators(mopidyActions, dispatch),
-  spotifyActions: bindActionCreators(spotifyActions, dispatch),
-});
-
-export default connect(mapStateToProps, mapDispatchToProps)(Search);
+export default Search;

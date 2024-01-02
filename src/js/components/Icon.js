@@ -17,7 +17,7 @@ const Icon = memo(({
       return (
         <span className={fullClassName}>
           <img
-            src={`/iris/assets/icons/${name}.svg`}
+            src={`assets/icons/${name}.svg`}
             onClick={onClick}
             alt={`${name} icon`}
           />
@@ -29,7 +29,7 @@ const Icon = memo(({
         <span className={fullClassName}>
           <img
             className={fullClassName}
-            src={`/iris/assets/icons/${name}.gif`}
+            src={`assets/icons/${name}.gif`}
             onClick={onClick}
             alt={`${name} icon`}
           />
@@ -72,6 +72,7 @@ const SourceIcon = ({
   switch (source) {
     case 'genius':
     case 'tidal':
+    case 'jellyfin':
       return <Icon name={source} type="svg" className="source" {...rest} />;
     default:
       return <Icon name={source} type="fontawesome" className="source" {...rest} />;

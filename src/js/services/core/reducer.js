@@ -55,11 +55,18 @@ export default function reducer(core = {}, action) {
       var radio = { ...core.radio, resolved_seeds: action.resolved_seeds };
       return { ...core, radio };
 
-      /**
-         * Index updates
-         * These actions are only ever called by middleware after we've digested one more many assets
-         * and appended to their relevant index.
-         * */
+    case 'SET_LOADING': {
+      return {
+        ...core,
+        items: {
+          ...core.items,
+          [action.uri]: {
+            ...core.items[action.uri] || { uri: action.uri },
+            loading: action.loading,
+          },
+        },
+      };
+    }
 
     case 'ITEM_LOADED':
       return {
@@ -101,17 +108,14 @@ export default function reducer(core = {}, action) {
       };
     }
 
-    case 'USER_PLAYLISTS_LOADED':
-      var users = { ...core.users };
-      var existing_playlists_uris = [];
+    case 'USER_PLAYLISTS_LOADED': {
+      const users = { ...core.users };
+      let existing_playlists_uris = [];
       if (users[action.uri] && users[action.uri].playlists_uris) {
-            	existing_playlists_uris = users[action.uri].playlists_uris;
+        existing_playlists_uris = users[action.uri].playlists_uris;
       }
-
-      var playlists_uris = [...existing_playlists_uris, ...arrayOf('uri', action.playlists)];
-
-      var user = {
-
+      const playlists_uris = [...existing_playlists_uris, ...arrayOf('uri', action.playlists)];
+      const user = {
         ...users[action.uri],
         playlists_uris,
         playlists_more: action.more,
@@ -119,6 +123,7 @@ export default function reducer(core = {}, action) {
       };
       users[action.uri] = user;
       return { ...core, users };
+    }
 
     case 'RESTORE_LIBRARY_FROM_COLD_STORE':
       const libraries = { ...core.libraries };
@@ -171,23 +176,14 @@ export default function reducer(core = {}, action) {
     /**
      * Search results
      * */
-    case 'START_SEARCH':
+
+    case 'SEARCH_RESULTS_LOADED': {
       return {
         ...core,
         search_results: {
-          query: action.query,
-          artists: [],
-          albums: [],
-          playlists: [],
-          tracks: [],
+          ...core?.search_results || {},
+          [action.key]: action.results,
         },
-      };
-
-    case 'SEARCH_RESULTS_LOADED': {
-      const { search_results } = action;
-      return {
-        ...core,
-        search_results,
       };
     }
 
